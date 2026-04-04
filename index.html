@@ -698,7 +698,8 @@ function sortByFirst(a, b) {
 Object.keys(roster).forEach(r => roster[r].sort(sortByFirst));
 
 function init() {
-  const today = new Date().toISOString().split('T')[0];
+  const now = new Date();
+  const today = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
   document.getElementById('reportDate').value = today;
   updateDateDisplay();
 
@@ -787,30 +788,30 @@ function renderEmployees() {
           </select>
           <button class="emp-remove" onclick="removeEmployee(${e.id})">&times;</button>
         </div>
-        <div class="emp-row-bottom">
+        <div class="emp-row-bottom" ${!e.name ? 'style="opacity:0.4; pointer-events:none;"' : ''}>
           ${(e.role === 'Busser' || e.role === 'Runner') ? `
           <div class="emp-field">
             <label>Hours</label>
             <input type="text" inputmode="decimal" value="${e.hours || ''}" placeholder="0.00"
-              onchange="updateEmployee(${e.id}, 'hours', this.value)">
+              ${!e.name ? 'disabled' : ''} onchange="updateEmployee(${e.id}, 'hours', this.value)">
           </div>` : ''}
           ${(e.role === 'Server') ? `
           <div class="emp-field">
             <label>Svc Chg (CC Tips)</label>
             <input type="text" inputmode="decimal" value="${e.svcChg || ''}" placeholder="0.00"
-              onchange="updateEmployee(${e.id}, 'svcChg', this.value)">
+              ${!e.name ? 'disabled' : ''} onchange="updateEmployee(${e.id}, 'svcChg', this.value)">
           </div>` : ''}
           ${(e.role === 'Server') ? `
           <div class="emp-field">
             <label>Cash Tips</label>
             <input type="text" inputmode="decimal" value="${e.cash || ''}" placeholder="0.00"
-              onchange="updateEmployee(${e.id}, 'cash', this.value); updateTotal(${e.id})">
+              ${!e.name ? 'disabled' : ''} onchange="updateEmployee(${e.id}, 'cash', this.value); updateTotal(${e.id})">
           </div>` : ''}
           ${(e.role === 'Bartender') ? `
           <div class="emp-field">
             <label>Tips</label>
             <input type="text" inputmode="decimal" value="${e.cash || ''}" placeholder="0.00"
-              onchange="updateEmployee(${e.id}, 'cash', this.value)">
+              ${!e.name ? 'disabled' : ''} onchange="updateEmployee(${e.id}, 'cash', this.value)">
           </div>` : ''}
           ${e.role === 'Server' ? `
           <div class="emp-field">
