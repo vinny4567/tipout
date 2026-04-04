@@ -1701,7 +1701,7 @@ function sendToGoogle(url, payload, callback) {
   try {
     var encoded = encodeURIComponent(JSON.stringify(payload));
     var script = document.createElement('script');
-    script.src = url + '?data=' + encoded + '&callback=tipoutSyncDone&t=' + Date.now();
+    script.src = url + '?data=' + encoded + '&callback=tipoutSyncDone&key=vtip-9f3k-x82m-p47w&t=' + Date.now();
 
     window.tipoutSyncDone = function(result) {
       delete window.tipoutSyncDone;
