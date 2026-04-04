@@ -1,0 +1,1695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TipOut">
+<meta name="theme-color" content="#0f1117">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f1117'/><text x='50' y='62' text-anchor='middle' font-size='40' fill='%2300e676'>$</text></svg>">
+<title>Tip-Out Calculator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242836;
+    --border: #2e3345;
+    --accent: #6c63ff;
+    --accent-hover: #5a52e0;
+    --accent-light: rgba(108, 99, 255, 0.12);
+    --green: #34d399;
+    --green-light: rgba(52, 211, 153, 0.12);
+    --red: #f87171;
+    --red-light: rgba(248, 113, 113, 0.12);
+    --text: #e8eaf0;
+    --text-dim: #8b8fa3;
+    --text-muted: #5c6070;
+    --yellow: #fbbf24;
+    --yellow-light: rgba(251, 191, 36, 0.12);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* Header */
+  .app-header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .app-header h1 { font-size: 18px; font-weight: 700; }
+  .header-right { text-align: right; }
+  .header-right .manager { font-size: 12px; color: var(--text-dim); }
+  .header-right .date { font-size: 11px; color: var(--text-muted); }
+
+  /* Tabs */
+  .tabs {
+    display: flex;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+  .tab {
+    padding: 12px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  /* Container */
+  .container { max-width: 700px; margin: 0 auto; padding: 16px; }
+
+  /* Panels */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+
+  .card-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-dim);
+    margin-bottom: 12px;
+  }
+
+  /* Settings grid */
+  .settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .setting-item label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+
+  .setting-input {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 600;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .setting-input:focus { border-color: var(--accent); }
+
+  /* Date input */
+  .date-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .date-row .setting-item { flex: 1; }
+
+  /* Employee entry */
+  .employee-entry {
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 8px;
+    animation: slideIn 0.2s ease;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .emp-row-top {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .emp-name {
+    flex: 1;
+    padding: 8px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 500;
+    outline: none;
+    cursor: pointer;
+    min-width: 0;
+  }
+  .emp-name:focus { border-color: var(--accent); }
+
+  .emp-role-select {
+    padding: 8px 10px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    outline: none;
+    cursor: pointer;
+    min-width: 110px;
+  }
+  .emp-role-select:focus { border-color: var(--accent); }
+
+  .emp-remove {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .emp-remove:hover { background: var(--red-light); color: var(--red); }
+
+  .emp-row-bottom {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .emp-row-extra {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .emp-field label {
+    display: block;
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+
+  .emp-field input {
+    width: 100px;
+    padding: 7px 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    outline: none;
+    text-align: right;
+  }
+  .emp-field input:focus { border-color: var(--accent); }
+
+  .add-emp-btn {
+    width: 100%;
+    padding: 12px;
+    background: var(--accent-light);
+    border: 1px dashed var(--accent);
+    border-radius: 10px;
+    color: var(--accent);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+  .add-emp-btn:active { background: var(--accent); color: white; }
+
+  /* Report table */
+  .report-section {
+    margin-bottom: 24px;
+  }
+
+  .report-jobcode {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+
+  .report-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .report-table th {
+    text-align: right;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim);
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .report-table th:first-child { text-align: left; }
+
+  .report-table td {
+    text-align: right;
+    padding: 8px 8px;
+    font-variant-numeric: tabular-nums;
+    border-bottom: 1px solid rgba(46, 51, 69, 0.4);
+  }
+  .report-table td:first-child {
+    text-align: left;
+    font-weight: 500;
+  }
+
+  .report-table .total-row td {
+    font-weight: 700;
+    border-top: 2px solid var(--accent);
+    border-bottom: none;
+    padding-top: 10px;
+    color: var(--accent);
+  }
+  .report-table .total-row td:first-child {
+    color: var(--text);
+  }
+
+  .remaining-col { color: var(--green) !important; font-weight: 700 !important; }
+
+  /* Tipout distribution section */
+  .dist-section {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+
+  .dist-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+
+  .dist-card {
+    background: var(--surface2);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 10px;
+  }
+
+  .dist-card-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+
+  .dist-pool {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  .dist-pool strong { color: var(--green); font-size: 14px; }
+
+  .dist-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(46, 51, 69, 0.4);
+  }
+  .dist-row:last-child { border-bottom: none; }
+
+  .dist-row .name { font-size: 13px; }
+  .dist-row .hours { font-size: 12px; color: var(--text-dim); margin-left: 8px; }
+  .dist-row .amount { font-size: 14px; font-weight: 700; color: var(--green); }
+
+  /* Grand totals */
+  .grand-total-card {
+    background: linear-gradient(135deg, rgba(108,99,255,0.1), rgba(52,211,153,0.1));
+    border: 1px solid var(--accent);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 20px;
+  }
+
+  .grand-total-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+
+  .grand-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+  }
+  .grand-row .label { font-size: 13px; color: var(--text-dim); }
+  .grand-row .value { font-size: 15px; font-weight: 700; }
+  .grand-row .value.green { color: var(--green); }
+
+  /* Buttons */
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 14px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+  }
+
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: var(--accent-hover); }
+
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+  }
+  .btn-outline:hover { border-color: var(--text-dim); color: var(--text); }
+
+  .btn-danger:hover { border-color: var(--red); color: var(--red); background: var(--red-light); }
+
+  /* Print styles */
+  .print-btn {
+    padding: 10px 20px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-dim);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 16px;
+  }
+  .print-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  @media print {
+    body { background: white; color: black; }
+    .app-header, .tabs, .panel:not(.report-panel) { display: none !important; }
+    .panel.report-panel { display: block !important; }
+    .card { border-color: #ccc; background: white; }
+    .report-table th { color: #666; border-bottom-color: #333; }
+    .report-table td { border-bottom-color: #ddd; }
+    .report-table .total-row td { border-top-color: #333; color: #333; }
+    .remaining-col { color: #000 !important; }
+    .print-btn, .no-print { display: none !important; }
+    .dist-card { background: #f5f5f5; }
+    .dist-card-title { color: #333; }
+    .grand-total-card { background: #f0f0f0; border-color: #333; }
+  }
+
+  /* Quick add buttons */
+  .quick-add-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .quick-add-btn {
+    padding: 6px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-dim);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .quick-add-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Responsive */
+  @media (max-width: 500px) {
+    .settings-grid { grid-template-columns: 1fr; }
+    .report-table { font-size: 11px; }
+    .report-table th, .report-table td { padding: 6px 4px; }
+  }
+
+  /* Hide number spinners */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type="number"] { -moz-appearance: textfield; }
+</style>
+</head>
+<body>
+
+<div class="app-header">
+  <h1>Tip-Out Calculator</h1>
+  <div class="header-right">
+    <div class="manager" id="managerDisplay">manager Vinny</div>
+    <div class="date" id="dateDisplay"></div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('input')">Employees</div>
+  <div class="tab" onclick="switchTab('party')">Private Party</div>
+  <div class="tab" onclick="switchTab('settings')">Settings</div>
+  <div class="tab" onclick="switchTab('report')">Report</div>
+</div>
+
+<div class="container">
+
+  <!-- SETTINGS PANEL -->
+  <div class="panel" id="panel-settings">
+    <div class="card">
+      <div class="card-title">Tip-Out Rates</div>
+      <div class="settings-grid">
+        <div class="setting-item">
+          <label>Server Tipout %</label>
+          <input type="number" class="setting-input" id="tipoutPct" value="20" min="0" max="100" step="1" oninput="saveSettings()">
+        </div>
+        <div class="setting-item">
+          <label>Runner $ per $100 earned</label>
+          <input type="number" class="setting-input" id="runnerPer100" value="5.00" min="0" step="0.50" oninput="saveSettings()">
+        </div>
+        <div class="setting-item">
+          <label>Busser Share of Tipout %</label>
+          <input type="number" class="setting-input" id="busserShare" value="75" min="0" max="100" step="1" oninput="saveSettings()">
+        </div>
+        <div class="setting-item">
+          <label>Bar Share of Tipout %</label>
+          <input type="number" class="setting-input" id="barShare" value="25" min="0" max="100" step="1" oninput="saveSettings()">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Report Info</div>
+      <div class="settings-grid">
+        <div class="setting-item">
+          <label>Manager Name</label>
+          <input type="text" class="setting-input" id="managerName" value="Vinny" oninput="saveSettings()">
+        </div>
+        <div class="setting-item">
+          <label>Date</label>
+          <input type="date" class="setting-input" id="reportDate" oninput="saveSettings()">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Google Sheets Sync</div>
+      <div class="settings-grid">
+        <div class="setting-item" style="grid-column: 1 / -1;">
+          <label>Google Script URL</label>
+          <input type="text" class="setting-input" id="googleScriptUrl" placeholder="Paste your Apps Script web app URL here" oninput="saveSettings()" style="font-size:12px;">
+        </div>
+      </div>
+      <div style="font-size:11px; color:var(--muted); margin-top:6px;">
+        See the setup guide to connect to Google Sheets. Once set up, tips sync automatically from the Report tab.
+      </div>
+      <div id="pendingSyncCount" style="font-size:12px; color:#ffa726; margin-top:6px;"></div>
+    </div>
+  </div>
+
+  <!-- EMPLOYEE INPUT PANEL -->
+  <div class="panel active" id="panel-input">
+    <button class="btn btn-outline btn-danger" style="width:100%; margin-bottom:14px;" onclick="clearAll()">Clear All</button>
+
+    <div class="card">
+      <div class="card-title">Servers</div>
+      <div id="employeeList-Server"></div>
+      <button class="add-emp-btn" onclick="addEmployee('Server')">+ Add Server</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Bartenders</div>
+      <div id="employeeList-Bartender"></div>
+      <button class="add-emp-btn" onclick="addEmployee('Bartender')">+ Add Bartender</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Bussers</div>
+      <div id="employeeList-Busser"></div>
+      <button class="add-emp-btn" onclick="addEmployee('Busser')">+ Add Busser</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Food Runners</div>
+      <div id="employeeList-Runner"></div>
+      <button class="add-emp-btn" onclick="addEmployee('Runner')">+ Add Runner</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Add New Employee to Roster</div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input type="text" id="newEmpName" class="emp-name" placeholder="Full Name" style="flex:1;">
+        <select id="newEmpRole" class="emp-role-select">
+          <option value="Server">Server</option>
+          <option value="Bartender">Bartender</option>
+          <option value="Busser">Busser</option>
+          <option value="Runner">Runner</option>
+        </select>
+        <button class="add-emp-btn" style="width:auto; margin-top:0; padding:8px 16px;" onclick="addToRoster()">Add</button>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="switchTab('report')">Calculate &amp; View Report</button>
+    </div>
+  </div>
+
+  <!-- PRIVATE PARTY PANEL -->
+  <div class="panel" id="panel-party">
+    <div class="card">
+      <div class="card-title">Party Info</div>
+      <div class="settings-grid">
+        <div class="setting-item">
+          <label>Party Name</label>
+          <input type="text" class="setting-input" id="partyName" placeholder="e.g. Smith Wedding">
+        </div>
+        <div class="setting-item">
+          <label>Total Party Tip</label>
+          <div style="position:relative;">
+            <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;font-weight:600;color:var(--text-dim);">$</span>
+            <input type="text" inputmode="decimal" class="setting-input" id="partyTip" placeholder="0.00" style="padding-left:28px;"
+              onchange="calculateParty()">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Servers</div>
+      <div id="partyList-Server"></div>
+      <button class="add-emp-btn" onclick="addPartyEmployee('Server')">+ Add Server</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Bartenders</div>
+      <div id="partyList-Bartender"></div>
+      <button class="add-emp-btn" onclick="addPartyEmployee('Bartender')">+ Add Bartender</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Bussers</div>
+      <div id="partyList-Busser"></div>
+      <button class="add-emp-btn" onclick="addPartyEmployee('Busser')">+ Add Busser</button>
+    </div>
+
+    <div class="card" id="partyResultsCard" style="display:none;">
+      <div class="card-title">Party Tipout Breakdown</div>
+      <div id="partyResults"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="calculateParty()">Calculate Party Tipout</button>
+      <button class="btn btn-outline btn-danger" onclick="clearParty()">Clear Party</button>
+    </div>
+  </div>
+
+  <!-- REPORT PANEL -->
+  <div class="panel report-panel" id="panel-report">
+    <div class="no-print" style="display:flex; gap:8px; margin-bottom:12px;">
+      <button class="print-btn" onclick="window.print()">Print Report</button>
+      <button class="btn" style="background:var(--green); color:#000; font-weight:600; padding:8px 16px; border:none; border-radius:8px; cursor:pointer;" onclick="saveToSpreadsheet()">Save to Device</button>
+      <button class="btn" id="syncBtn" style="background:#4285f4; color:#fff; font-weight:600; padding:8px 16px; border:none; border-radius:8px; cursor:pointer;" onclick="syncToGoogleSheets()">
+        <span id="syncBtnText">Save to Google Sheets</span>
+      </button>
+    </div>
+    <div id="syncStatus" style="margin-bottom:8px; font-size:12px; color:var(--muted);"></div>
+    <div id="reportContent"></div>
+  </div>
+
+</div>
+
+<script>
+let employees = [];
+let nextId = 1;
+
+// Full employee roster by role
+const roster = {
+  Bartender: [
+    'Haley Cassells', 'Kirsten O\'Hara', 'Martin Rife', 'Michael Goodwin',
+    'Nancy Newell', 'Pricilla Lagace', 'Robin Jaramillo', 'Gyselle Tavizon'
+  ],
+  Server: [
+    'Ashley Penick', 'Ava Fangmann', 'Emma Dawson', 'Colleen Morgan',
+    'Connor Batogowski', 'Gyselle Tavizon', 'Hannah Pierce', 'Isabel Wilde',
+    'Jaden Tareta', 'Jared Malek', 'Kristina Mastrino', 'Trinette Notarangeli',
+    'Valerie Mitchell', 'Carter Bergholtz', 'Vincent Notarangeli',
+    'Ernest Notarangeli', 'Angelo Notarangeli', 'Cody Brickner', 'Mike Fornero'
+  ],
+  Runner: [
+    'Carson Cassell', 'Drew Mastrino', 'Drew Murphy', 'Lexi Allen',
+    'Preston Rose', 'Sean Young'
+  ],
+  Busser: [
+    'Addison Feldmann', 'Allison Wolf', 'Angel Morales', 'Carter Berning',
+    'Dennis Anderson', 'Drew Murphy', 'Jackson Trotta', 'Jason Hornbaker',
+    'Kamila Skorupskas', 'Kayleigh Knight', 'Lauren Jennings', 'Luke Johnson',
+    'Matthew Kralik', 'Sona Hudakova', 'Taylor Kunka', 'Micah Fiore',
+    'Ryan Walsh', 'Katelyn Batogowski', 'Will Harvey', 'Erin Burke',
+    'Susah Hurwitz'
+  ]
+};
+
+// Sort each roster alphabetically
+// Sort by first name
+function sortByFirst(a, b) {
+  const aFirst = a.split(' ').slice(-1)[0] || a;
+  const bFirst = b.split(' ').slice(-1)[0] || b;
+  // Actually names are "First Last", so split by space and take first part
+  return a.split(' ')[0].localeCompare(b.split(' ')[0]);
+}
+Object.keys(roster).forEach(r => roster[r].sort(sortByFirst));
+
+function init() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('reportDate').value = today;
+  updateDateDisplay();
+
+  // Default layout: 5 servers, 3 bartenders, 1 runner, 5 bussers
+  for (let i = 0; i < 5; i++) employees.push({ id: nextId++, name: '', role: 'Server', hours: 0, svcChg: 0, cash: 0 });
+  for (let i = 0; i < 3; i++) employees.push({ id: nextId++, name: '', role: 'Bartender', hours: 0, svcChg: 0, cash: 0 });
+  for (let i = 0; i < 1; i++) employees.push({ id: nextId++, name: '', role: 'Runner', hours: 0, svcChg: 0, cash: 0 });
+  for (let i = 0; i < 5; i++) employees.push({ id: nextId++, name: '', role: 'Busser', hours: 0, svcChg: 0, cash: 0 });
+
+  renderEmployees();
+}
+
+function addToRoster() {
+  const nameInput = document.getElementById('newEmpName');
+  const roleSelect = document.getElementById('newEmpRole');
+  const name = nameInput.value.trim();
+  const role = roleSelect.value;
+  if (!name) return;
+  if (!roster[role].includes(name)) {
+    roster[role].push(name);
+    roster[role].sort(sortByFirst);
+  }
+  nameInput.value = '';
+  renderEmployees();
+}
+
+function addEmployee(role = 'Server') {
+  employees.push({ id: nextId++, name: '', role, hours: 0, svcChg: 0, cash: 0 });
+  renderEmployees();
+}
+
+function removeEmployee(id) {
+  employees = employees.filter(e => e.id !== id);
+  renderEmployees();
+}
+
+function updateEmployee(id, field, value) {
+  const emp = employees.find(e => e.id === id);
+  if (!emp) return;
+  if (field === 'name') {
+    if (!value) {
+      emp.hours = 0;
+      emp.svcChg = 0;
+      emp.cash = 0;
+    }
+    emp.name = value;
+    renderEmployees();
+  } else if (field === 'role') {
+    emp[field] = value;
+    renderEmployees();
+  } else {
+    emp[field] = parseFloat(parseFloat(value || 0).toFixed(2));
+  }
+  updateTotal(id);
+}
+
+function updateTotal(id) {
+  const emp = employees.find(e => e.id === id);
+  if (!emp || emp.role !== 'Server') return;
+  const el = document.getElementById('total-' + id);
+  if (el) {
+    const total = Math.round((emp.svcChg + emp.cash) * 100) / 100;
+    el.value = total ? '$' + total.toFixed(2) : '';
+  }
+}
+
+function renderEmployees() {
+  ['Server', 'Bartender', 'Busser', 'Runner'].forEach(role => {
+    const list = document.getElementById('employeeList-' + role);
+    if (!list) return;
+    const roleEmps = employees.filter(e => e.role === role);
+    const takenNames = roleEmps.map(e => e.name).filter(n => n);
+    list.innerHTML = roleEmps.map(e => {
+      const names = roster[e.role] || [];
+      const nameOptions = names
+        .map(n => {
+          const taken = n !== e.name && takenNames.includes(n);
+          return `<option value="${n}" ${e.name === n ? 'selected' : ''} ${taken ? 'disabled style="color:#5c6070;"' : ''}>${n}${taken ? ' (on shift)' : ''}</option>`;
+        }).join('');
+      return `
+      <div class="employee-entry">
+        <div class="emp-row-top">
+          <select class="emp-name" onchange="updateEmployee(${e.id}, 'name', this.value)">
+            <option value="">-- Select --</option>
+            ${nameOptions}
+          </select>
+          <button class="emp-remove" onclick="removeEmployee(${e.id})">&times;</button>
+        </div>
+        <div class="emp-row-bottom">
+          ${(e.role === 'Busser' || e.role === 'Runner') ? `
+          <div class="emp-field">
+            <label>Hours</label>
+            <input type="text" inputmode="decimal" value="${e.hours || ''}" placeholder="0.00"
+              onchange="updateEmployee(${e.id}, 'hours', this.value)">
+          </div>` : ''}
+          ${(e.role === 'Server') ? `
+          <div class="emp-field">
+            <label>Svc Chg (CC Tips)</label>
+            <input type="text" inputmode="decimal" value="${e.svcChg || ''}" placeholder="0.00"
+              onchange="updateEmployee(${e.id}, 'svcChg', this.value)">
+          </div>` : ''}
+          ${(e.role === 'Server') ? `
+          <div class="emp-field">
+            <label>Cash Tips</label>
+            <input type="text" inputmode="decimal" value="${e.cash || ''}" placeholder="0.00"
+              onchange="updateEmployee(${e.id}, 'cash', this.value); updateTotal(${e.id})">
+          </div>` : ''}
+          ${(e.role === 'Bartender') ? `
+          <div class="emp-field">
+            <label>Tips</label>
+            <input type="text" inputmode="decimal" value="${e.cash || ''}" placeholder="0.00"
+              onchange="updateEmployee(${e.id}, 'cash', this.value)">
+          </div>` : ''}
+          ${e.role === 'Server' ? `
+          <div class="emp-field">
+            <label>Total</label>
+            <input type="text" id="total-${e.id}" value="${(e.svcChg + e.cash) ? '$' + (Math.round((e.svcChg + e.cash) * 100) / 100).toFixed(2) : ''}"
+              readonly style="width:100px; color:var(--green); background:var(--surface); border-color:transparent; cursor:default;">
+          </div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  });
+}
+
+function getSettings() {
+  return {
+    tipoutPct: (parseFloat(document.getElementById('tipoutPct').value) || 20) / 100,
+    runnerPer100: parseFloat(document.getElementById('runnerPer100').value) || 5,
+    busserShare: (parseFloat(document.getElementById('busserShare').value) || 75) / 100,
+    barShare: (parseFloat(document.getElementById('barShare').value) || 25) / 100,
+    manager: document.getElementById('managerName').value || 'Manager',
+    date: document.getElementById('reportDate').value,
+  };
+}
+
+function saveSettings() {
+  updateDateDisplay();
+  // Persist Google Script URL
+  const gUrl = document.getElementById('googleScriptUrl');
+  if (gUrl) localStorage.setItem('tipout_google_url', gUrl.value);
+}
+
+function loadGoogleUrl() {
+  const saved = localStorage.getItem('tipout_google_url');
+  const el = document.getElementById('googleScriptUrl');
+  if (saved && el) el.value = saved;
+}
+
+function updateDateDisplay() {
+  const s = getSettings();
+  document.getElementById('managerDisplay').textContent = 'manager ' + s.manager;
+  const d = s.date ? new Date(s.date + 'T12:00:00') : new Date();
+  document.getElementById('dateDisplay').textContent =
+    d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) +
+    ' ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
+function calculate() {
+  const s = getSettings();
+  const roles = { Bartender: [], Busser: [], Runner: [], Server: [] };
+
+  employees.forEach(e => {
+    if (roles[e.role] && e.name) roles[e.role].push({ ...e });
+  });
+
+  // Check which support roles are actually staffed (have at least one name selected)
+  const hasRunners = roles.Runner.some(e => e.name);
+  const hasBussers = roles.Busser.some(e => e.name);
+  const hasBartenders = roles.Bartender.some(e => e.name);
+
+  // Calculate server tipouts
+  const serverResults = roles.Server.map(srv => {
+    const totalTips = srv.svcChg + srv.cash;
+    // Runner tipout only if runners are on shift
+    const runnerTipout = hasRunners ? Math.floor(totalTips / 100) * s.runnerPer100 : 0;
+    const adjustedTotal = totalTips - runnerTipout;
+    // 20% always comes off if bartenders are on shift (they always get tipped)
+    const twentyPctTipout = hasBartenders ? Math.floor(adjustedTotal * s.tipoutPct * 100) / 100 : 0;
+    // Bar always gets their cut if bartenders are present
+    const barTipout = hasBartenders ? Math.floor(twentyPctTipout * s.barShare * 100) / 100 : 0;
+    // Bussers only get their cut if bussers are on shift; otherwise servers keep it
+    const busserTipout = hasBussers ? Math.floor(twentyPctTipout * s.busserShare * 100) / 100 : 0;
+    // Servers keep: total - runner - bar tipout - busser tipout (if no bussers, that portion stays)
+    const remaining = Math.floor((totalTips - runnerTipout - barTipout - busserTipout) * 100) / 100;
+
+    return {
+      ...srv,
+      runnerTipout,
+      twentyPctTipout,
+      barTipout,
+      busserTipout,
+      remaining,
+    };
+  });
+
+  // Pools
+  const runnerPool = serverResults.reduce((s, r) => s + r.runnerTipout, 0);
+  const barPool = serverResults.reduce((s, r) => s + r.barTipout, 0);
+  const busserPool = serverResults.reduce((s, r) => s + r.busserTipout, 0);
+
+  // Distribute pools by hours
+  function distribute(pool, emps) {
+    const totalHours = emps.reduce((s, e) => s + e.hours, 0);
+    if (totalHours === 0) return emps.map(e => ({ ...e, tipReceived: 0 }));
+    return emps.map(e => ({
+      ...e,
+      tipReceived: Math.floor((e.hours / totalHours) * pool * 100) / 100,
+    }));
+  }
+
+  // Bartenders split evenly
+  const bartenderCount = roles.Bartender.length;
+  const bartenderResults = roles.Bartender.map(b => ({
+    ...b,
+    tipReceived: bartenderCount > 0 ? Math.floor((barPool / bartenderCount) * 100) / 100 : 0,
+  }));
+  const busserResults = distribute(busserPool, roles.Busser);
+  // Runners: if only 1 runner, they get the whole pool; if multiple, split by hours
+  let runnerResults;
+  if (roles.Runner.length === 1) {
+    runnerResults = roles.Runner.map(r => ({ ...r, tipReceived: runnerPool }));
+  } else {
+    runnerResults = distribute(runnerPool, roles.Runner);
+  }
+
+  // Add own tips for bartenders
+  bartenderResults.forEach(b => {
+    b.ownTips = b.svcChg + b.cash;
+    b.remaining = b.ownTips + b.tipReceived;
+  });
+  busserResults.forEach(b => {
+    b.ownTips = b.svcChg + b.cash;
+    b.remaining = b.ownTips + b.tipReceived;
+  });
+  runnerResults.forEach(r => {
+    r.ownTips = r.svcChg + r.cash;
+    r.remaining = r.ownTips + r.tipReceived;
+  });
+
+  return { serverResults, bartenderResults, busserResults, runnerResults, runnerPool, barPool, busserPool, settings: s };
+}
+
+function fmt(n) {
+  return n.toFixed(2);
+}
+
+function generateReport() {
+  const data = calculate();
+  const s = data.settings;
+  const d = s.date ? new Date(s.date + 'T12:00:00') : new Date();
+  const dateStr = d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+  const pctLabel = Math.round(s.tipoutPct * 100) + '%';
+
+  let html = '';
+
+  // Title
+  html += `<div style="text-align:center; margin-bottom: 20px;">
+    <div style="font-size:11px; color:var(--text-dim);">From: ${dateStr} To: ${dateStr}</div>
+  </div>`;
+
+  // ===== BARTENDER SECTION =====
+  if (data.bartenderResults.length > 0) {
+    html += `<div class="report-section"><div class="report-jobcode">Job code: Bartender</div>`;
+    html += `<table class="report-table">
+      <tr>
+        <th></th><th>Tips</th>
+      </tr>`;
+    data.bartenderResults.forEach(b => {
+      html += `<tr>
+        <td>${b.name || 'Unnamed'}</td>
+        <td class="remaining-col">${fmt(b.remaining)}</td>
+      </tr>`;
+    });
+    html += `</table></div>`;
+  }
+
+  // ===== BUSSER SECTION =====
+  if (data.busserResults.length > 0) {
+    html += `<div class="report-section"><div class="report-jobcode">Job code: Busser</div>`;
+    html += `<table class="report-table">
+      <tr>
+        <th></th><th>Total<br>Hours</th><th>Total Svc<br>Chg</th><th>Cash<br>Tips</th>
+        <th>Runner<br>TipOut</th><th>${pctLabel}<br>Tipout</th><th>Bar<br>Tipout</th>
+        <th>Busser<br>Tipout</th><th>Remaining<br>Tips</th>
+      </tr>`;
+    let totH = 0, totS = 0;
+    data.busserResults.forEach(b => {
+      totH += b.hours; totS += b.svcChg;
+      html += `<tr>
+        <td>${b.name || 'Unnamed'}</td><td>${fmt(b.hours)}</td><td>${fmt(b.svcChg)}</td>
+        <td>${fmt(b.cash)}</td><td>0.00</td><td>0.00</td><td>0.00</td><td>0.00</td>
+        <td class="remaining-col">${fmt(b.tipReceived)}</td>
+      </tr>`;
+    });
+    html += `<tr class="total-row">
+      <td>Busser Total</td><td>${fmt(totH)}</td><td>${fmt(totS)}</td>
+      <td colspan="6"></td>
+    </tr></table></div>`;
+  }
+
+  // ===== RUNNER SECTION =====
+  if (data.runnerResults.length > 0) {
+    html += `<div class="report-section"><div class="report-jobcode">Job code: Runner</div>`;
+    html += `<table class="report-table">
+      <tr>
+        <th></th><th>Total<br>Hours</th><th>Total Svc<br>Chg</th><th>Cash<br>Tips</th>
+        <th>Runner<br>TipOut</th><th>${pctLabel}<br>Tipout</th><th>Bar<br>Tipout</th>
+        <th>Busser<br>Tipout</th><th>Remaining<br>Tips</th>
+      </tr>`;
+    let totH = 0, totS = 0;
+    data.runnerResults.forEach(r => {
+      totH += r.hours; totS += r.svcChg;
+      html += `<tr>
+        <td>${r.name || 'Unnamed'}</td><td>${fmt(r.hours)}</td><td>${fmt(r.svcChg)}</td>
+        <td>${fmt(r.cash)}</td><td>0.00</td><td>0.00</td><td>0.00</td><td>0.00</td>
+        <td class="remaining-col">${fmt(r.tipReceived)}</td>
+      </tr>`;
+    });
+    html += `<tr class="total-row">
+      <td>Runner Total</td><td>${fmt(totH)}</td><td>${fmt(totS)}</td>
+      <td colspan="6"></td>
+    </tr></table></div>`;
+  }
+
+  // ===== SERVER SECTION =====
+  if (data.serverResults.length > 0) {
+    html += `<div class="report-section"><div class="report-jobcode">Job code: Server</div>`;
+    html += `<table class="report-table">
+      <tr>
+        <th></th><th>Total Svc<br>Chg</th><th>Cash<br>Tips</th>
+        <th>Runner<br>TipOut</th><th>${pctLabel}<br>Tipout</th><th>Bar<br>Tipout</th>
+        <th>Busser<br>Tipout</th><th>Remaining<br>Tips</th>
+      </tr>`;
+
+    let totS = 0, totCash = 0, totRunner = 0, totPct = 0, totBar = 0, totBusser = 0, totRemain = 0;
+    data.serverResults.forEach(sv => {
+      totS += sv.svcChg; totCash += sv.cash;
+      totRunner += sv.runnerTipout; totPct += sv.twentyPctTipout;
+      totBar += sv.barTipout; totBusser += sv.busserTipout; totRemain += sv.remaining;
+      html += `<tr>
+        <td>${sv.name || 'Unnamed'}</td><td>${fmt(sv.svcChg)}</td>
+        <td>${fmt(sv.cash)}</td><td>${fmt(sv.runnerTipout)}</td><td>${fmt(sv.twentyPctTipout)}</td>
+        <td>${fmt(sv.barTipout)}</td><td></td>
+        <td class="remaining-col">${fmt(sv.remaining)}</td>
+      </tr>`;
+    });
+    html += `<tr class="total-row">
+      <td>Server Total</td><td>${fmt(totS)}</td>
+      <td>${fmt(totCash)}</td><td>${fmt(totRunner)}</td><td>${fmt(totPct)}</td>
+      <td>${fmt(totBar)}</td><td>${fmt(totBusser)}</td>
+      <td class="remaining-col">${fmt(totRemain)}</td>
+    </tr></table></div>`;
+  }
+
+  // ===== TIPOUT DISTRIBUTION =====
+  html += `<div class="dist-section"><div class="dist-title">Tipout Distribution</div>`;
+
+  if (data.busserResults.length > 0) {
+    html += `<div class="dist-card">
+      <div class="dist-card-title">Busser Pool</div>
+      <div class="dist-pool">Total: <strong>$${fmt(data.busserPool)}</strong> &middot; distributed by hours</div>`;
+    data.busserResults.forEach(b => {
+      html += `<div class="dist-row">
+        <div><span class="name">${b.name || 'Unnamed'}</span><span class="hours">${fmt(b.hours)} hrs</span></div>
+        <div class="amount">$${fmt(b.tipReceived)}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  if (data.bartenderResults.length > 0) {
+    html += `<div class="dist-card">
+      <div class="dist-card-title">Bar Pool</div>
+      <div class="dist-pool">Total: <strong>$${fmt(data.barPool)}</strong> &middot; distributed by hours</div>`;
+    data.bartenderResults.forEach(b => {
+      html += `<div class="dist-row">
+        <div><span class="name">${b.name || 'Unnamed'}</span><span class="hours">${fmt(b.hours)} hrs</span></div>
+        <div class="amount">$${fmt(b.tipReceived)}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  if (data.runnerResults.length > 0) {
+    html += `<div class="dist-card">
+      <div class="dist-card-title">Runner Pool</div>
+      <div class="dist-pool">Total: <strong>$${fmt(data.runnerPool)}</strong> &middot; distributed by hours</div>`;
+    data.runnerResults.forEach(r => {
+      html += `<div class="dist-row">
+        <div><span class="name">${r.name || 'Unnamed'}</span><span class="hours">${fmt(r.hours)} hrs</span></div>
+        <div class="amount">$${fmt(r.tipReceived)}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `</div>`;
+
+  // Grand total
+  const allTips = employees.reduce((s, e) => s + e.svcChg + e.cash, 0);
+  html += `<div class="grand-total-card">
+    <div class="grand-total-title">Summary</div>
+    <div class="grand-row"><span class="label">Total Tips In</span><span class="value green">$${fmt(allTips)}</span></div>
+    <div class="grand-row"><span class="label">Server Remaining</span><span class="value">$${fmt(data.serverResults.reduce((s,r) => s + r.remaining, 0))}</span></div>
+    <div class="grand-row"><span class="label">Busser Pool</span><span class="value">$${fmt(data.busserPool)}</span></div>
+    <div class="grand-row"><span class="label">Bar Pool</span><span class="value">$${fmt(data.barPool)}</span></div>
+    <div class="grand-row"><span class="label">Runner Pool</span><span class="value">$${fmt(data.runnerPool)}</span></div>
+  </div>`;
+
+  document.getElementById('reportContent').innerHTML = html;
+}
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    const names = ['input', 'party', 'settings', 'report'];
+    t.classList.toggle('active', names[i] === tab);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById('panel-' + tab);
+  if (panel) {
+    panel.classList.add('active');
+    if (tab === 'report') generateReport();
+  }
+}
+
+function clearAll() {
+  employees = [];
+  nextId = 1;
+  // Re-create default empty slots
+  for (let i = 0; i < 5; i++) employees.push({ id: nextId++, name: '', role: 'Server', hours: 0, svcChg: 0, cash: 0 });
+  for (let i = 0; i < 3; i++) employees.push({ id: nextId++, name: '', role: 'Bartender', hours: 0, svcChg: 0, cash: 0 });
+  for (let i = 0; i < 1; i++) employees.push({ id: nextId++, name: '', role: 'Runner', hours: 0, svcChg: 0, cash: 0 });
+  for (let i = 0; i < 5; i++) employees.push({ id: nextId++, name: '', role: 'Busser', hours: 0, svcChg: 0, cash: 0 });
+  renderEmployees();
+}
+
+// ===== PRIVATE PARTY =====
+let partyEmps = [];
+let partyNextId = 1000;
+
+function initParty() {
+  for (let i = 0; i < 5; i++) partyEmps.push({ id: partyNextId++, name: '', role: 'Server', hours: 0 });
+  for (let i = 0; i < 1; i++) partyEmps.push({ id: partyNextId++, name: '', role: 'Bartender', hours: 0 });
+  for (let i = 0; i < 3; i++) partyEmps.push({ id: partyNextId++, name: '', role: 'Busser', hours: 0 });
+  renderPartyEmployees();
+}
+
+function addPartyEmployee(role) {
+  partyEmps.push({ id: partyNextId++, name: '', role, hours: 0 });
+  renderPartyEmployees();
+}
+
+function removePartyEmployee(id) {
+  partyEmps = partyEmps.filter(e => e.id !== id);
+  renderPartyEmployees();
+}
+
+function updatePartyEmployee(id, field, value) {
+  const emp = partyEmps.find(e => e.id === id);
+  if (!emp) return;
+  if (field === 'name') {
+    if (!value) emp.hours = 0;
+    emp.name = value;
+    renderPartyEmployees();
+  } else {
+    emp[field] = parseFloat(parseFloat(value || 0).toFixed(2));
+  }
+}
+
+function renderPartyEmployees() {
+  ['Server', 'Bartender', 'Busser'].forEach(role => {
+    const list = document.getElementById('partyList-' + role);
+    if (!list) return;
+    const roleEmps = partyEmps.filter(e => e.role === role);
+    const takenNames = roleEmps.map(e => e.name).filter(n => n);
+    list.innerHTML = roleEmps.map(e => {
+      const names = roster[role] || [];
+      const nameOptions = names.map(n => {
+        const taken = n !== e.name && takenNames.includes(n);
+        return `<option value="${n}" ${e.name === n ? 'selected' : ''} ${taken ? 'disabled style="color:#5c6070;"' : ''}>${n}${taken ? ' (on shift)' : ''}</option>`;
+      }).join('');
+      return `
+      <div class="employee-entry">
+        <div class="emp-row-top">
+          <select class="emp-name" onchange="updatePartyEmployee(${e.id}, 'name', this.value)">
+            <option value="">-- Select --</option>
+            ${nameOptions}
+          </select>
+          <button class="emp-remove" onclick="removePartyEmployee(${e.id})">&times;</button>
+        </div>
+        ${(role === 'Busser') ? `
+        <div class="emp-row-bottom">
+          <div class="emp-field">
+            <label>Hours</label>
+            <input type="text" inputmode="decimal" value="${e.hours || ''}" placeholder="0.00"
+              onchange="updatePartyEmployee(${e.id}, 'hours', this.value)">
+          </div>
+        </div>` : ''}
+      </div>`;
+    }).join('');
+  });
+}
+
+function calculateParty() {
+  const totalTip = parseFloat(document.getElementById('partyTip').value) || 0;
+  if (totalTip <= 0) return;
+
+  const s = getSettings();
+  const servers = partyEmps.filter(e => e.role === 'Server' && e.name);
+  const bartenders = partyEmps.filter(e => e.role === 'Bartender' && e.name);
+  const bussers = partyEmps.filter(e => e.role === 'Busser' && e.name);
+
+  // 20% always comes off if bartenders are present
+  const partyHasBussers = bussers.length > 0;
+  const partyHasBartenders = bartenders.length > 0;
+  const tipoutAmount = partyHasBartenders ? Math.floor(totalTip * s.tipoutPct * 100) / 100 : 0;
+  const barPool = partyHasBartenders ? Math.floor(tipoutAmount * s.barShare * 100) / 100 : 0;
+  const busserPool = partyHasBussers ? Math.floor(tipoutAmount * s.busserShare * 100) / 100 : 0;
+  // Servers keep total minus only what actually goes out
+  const serverKeep = Math.floor((totalTip - barPool - busserPool) * 100) / 100;
+
+  // Server split: even among servers
+  const perServer = servers.length > 0 ? Math.floor((serverKeep / servers.length) * 100) / 100 : 0;
+
+  // Bartender split: even
+  const perBartender = bartenders.length > 0 ? Math.floor((barPool / bartenders.length) * 100) / 100 : 0;
+
+  // Busser split: by hours
+  const totalBusserHours = bussers.reduce((s, b) => s + b.hours, 0);
+  const busserRate = totalBusserHours > 0 ? busserPool / totalBusserHours : 0;
+
+  let html = '';
+
+  // Servers
+  if (servers.length > 0) {
+    html += `<div class="report-jobcode" style="margin-top:8px;">Servers</div>`;
+    html += `<div class="dist-pool">Total kept: <strong>$${fmt(serverKeep)}</strong> &middot; $${fmt(perServer)} each</div>`;
+    servers.forEach(sv => {
+      html += `<div class="dist-row"><span class="name">${sv.name}</span><span class="amount">$${fmt(perServer)}</span></div>`;
+    });
+  }
+
+  // Bartenders
+  if (bartenders.length > 0) {
+    html += `<div class="report-jobcode" style="margin-top:16px;">Bartenders</div>`;
+    html += `<div class="dist-pool">Bar pool: <strong>$${fmt(barPool)}</strong> &middot; $${fmt(perBartender)} each</div>`;
+    bartenders.forEach(b => {
+      html += `<div class="dist-row"><span class="name">${b.name}</span><span class="amount">$${fmt(perBartender)}</span></div>`;
+    });
+  }
+
+  // Bussers
+  if (bussers.length > 0) {
+    html += `<div class="report-jobcode" style="margin-top:16px;">Bussers</div>`;
+    html += `<div class="dist-pool">Busser pool: <strong>$${fmt(busserPool)}</strong> &middot; $${fmt(Math.floor(busserRate * 100) / 100)}/hr</div>`;
+    bussers.forEach(b => {
+      const pay = Math.floor(b.hours * busserRate * 100) / 100;
+      html += `<div class="dist-row"><div><span class="name">${b.name}</span><span class="hours">${b.hours} hrs</span></div><span class="amount">$${fmt(pay)}</span></div>`;
+    });
+  }
+
+  // Summary
+  html += `<div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border);">
+    <div class="dist-row"><span style="color:var(--text-dim);">Total Party Tip</span><span class="amount">$${fmt(totalTip)}</span></div>
+    <div class="dist-row"><span style="color:var(--text-dim);">${Math.round(s.tipoutPct * 100)}% Tipout</span><span style="font-weight:600;">$${fmt(tipoutAmount)}</span></div>
+  </div>`;
+
+  document.getElementById('partyResults').innerHTML = html;
+  document.getElementById('partyResultsCard').style.display = 'block';
+}
+
+function clearParty() {
+  partyEmps = [];
+  partyNextId = 1000;
+  document.getElementById('partyTip').value = '';
+  document.getElementById('partyName').value = '';
+  document.getElementById('partyResultsCard').style.display = 'none';
+  initParty();
+}
+
+function saveToSpreadsheet() {
+  try {
+    const data = calculate();
+    const s = data.settings;
+    const d = s.date ? new Date(s.date + 'T12:00:00') : new Date();
+    const dateStr = (d.getMonth()+1).toString().padStart(2,'0') + '-' + d.getDate().toString().padStart(2,'0') + '-' + d.getFullYear();
+    const sheetName = dateStr;
+    const fileName = 'TipOut-' + dateStr + '.xlsx';
+
+    // Check if there's any data to save
+    const hasData = employees.some(e => e.name && (e.svcChg > 0 || e.cash > 0 || e.hours > 0));
+    if (!hasData) {
+      alert('No tip data to save. Please select employee names and enter tip amounts first.');
+      return;
+    }
+
+    // Build rows for the sheet
+    const rows = [];
+    rows.push(['Tip-Out Report: ' + dateStr]);
+    rows.push([]);
+
+    // Servers
+    if (data.serverResults.length > 0) {
+      rows.push(['SERVERS']);
+      rows.push(['Name', 'Svc Chg', 'Cash Tips', 'Runner TipOut', '20% TipOut', 'Bar TipOut', 'Busser TipOut', 'Remaining']);
+      let totS=0, totC=0, totR=0, tot20=0, totB=0, totBu=0, totRem=0;
+      data.serverResults.forEach(sv => {
+        totS+=sv.svcChg; totC+=sv.cash; totR+=sv.runnerTipout; tot20+=sv.twentyPctTipout;
+        totB+=sv.barTipout; totBu+=sv.busserTipout; totRem+=sv.remaining;
+        rows.push([sv.name, sv.svcChg, sv.cash, sv.runnerTipout, sv.twentyPctTipout, sv.barTipout, sv.busserTipout, sv.remaining]);
+      });
+      rows.push(['Server Total', totS, totC, totR, tot20, totB, totBu, totRem]);
+      rows.push([]);
+    }
+
+    // Bartenders
+    if (data.bartenderResults.length > 0) {
+      rows.push(['BARTENDERS']);
+      rows.push(['Name', 'Own Tips', 'Tipout Received', 'Total']);
+      data.bartenderResults.forEach(b => {
+        rows.push([b.name, b.ownTips, b.tipReceived, b.remaining]);
+      });
+      rows.push([]);
+    }
+
+    // Bussers
+    if (data.busserResults.length > 0) {
+      rows.push(['BUSSERS']);
+      rows.push(['Name', 'Hours', 'Tipout Received']);
+      data.busserResults.forEach(b => {
+        rows.push([b.name, b.hours, b.tipReceived]);
+      });
+      rows.push(['Busser Pool Total', '', data.busserPool]);
+      rows.push([]);
+    }
+
+    // Runners
+    if (data.runnerResults.length > 0) {
+      rows.push(['RUNNERS']);
+      rows.push(['Name', 'Hours', 'Tipout Received']);
+      data.runnerResults.forEach(r => {
+        rows.push([r.name, r.hours, r.tipReceived]);
+      });
+      rows.push(['Runner Pool Total', '', data.runnerPool]);
+      rows.push([]);
+    }
+
+    // Summary
+    const allTips = employees.reduce((s, e) => s + e.svcChg + e.cash, 0);
+    rows.push(['SUMMARY']);
+    rows.push(['Total Tips In', allTips]);
+    rows.push(['Server Remaining', data.serverResults.reduce((s,r) => s + r.remaining, 0)]);
+    rows.push(['Busser Pool', data.busserPool]);
+    rows.push(['Bar Pool', data.barPool]);
+    rows.push(['Runner Pool', data.runnerPool]);
+
+    // Create worksheet from rows
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [
+      {wch: 22}, {wch: 12}, {wch: 12}, {wch: 14}, {wch: 12}, {wch: 12}, {wch: 14}, {wch: 12}
+    ];
+
+    for (let R = 0; R < rows.length; R++) {
+      for (let C = 0; C < rows[R].length; C++) {
+        const addr = XLSX.utils.encode_cell({r: R, c: C});
+        const cell = ws[addr];
+        if (cell && typeof cell.v === 'number' && C > 0) {
+          cell.z = '#,##0.00';
+        }
+      }
+    }
+
+    // Try to load existing workbook from IndexedDB, or create new
+    loadWorkbook(function(wb) {
+      // Remove existing sheet with same name if it exists (overwrite for same date)
+      const existingIdx = wb.SheetNames.indexOf(sheetName);
+      if (existingIdx > -1) {
+        wb.SheetNames.splice(existingIdx, 1);
+        delete wb.Sheets[sheetName];
+      }
+
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+      // Save to IndexedDB for accumulation
+      saveWorkbook(wb, function() {
+        // Trigger download
+        const blob = new Blob(
+          [s2ab(XLSX.write(wb, {bookType: 'xlsx', type: 'binary'}))],
+          {type: 'application/octet-stream'}
+        );
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+
+        alert('Saved! Sheet "' + sheetName + '" added to ' + fileName + '\nTotal sheets: ' + wb.SheetNames.length);
+      });
+    });
+
+  } catch(err) {
+    alert('Error saving: ' + err.message);
+    console.error('saveToSpreadsheet error:', err);
+  }
+}
+
+// IndexedDB storage (more reliable than localStorage for binary data)
+function openTipDB(callback) {
+  const req = indexedDB.open('TipOutDB', 1);
+  req.onupgradeneeded = function(e) {
+    e.target.result.createObjectStore('workbooks');
+  };
+  req.onsuccess = function(e) { callback(e.target.result); };
+  req.onerror = function() {
+    console.error('IndexedDB error, falling back to new workbook');
+    callback(null);
+  };
+}
+
+function loadWorkbook(callback) {
+  openTipDB(function(db) {
+    if (!db) { callback(XLSX.utils.book_new()); return; }
+    const tx = db.transaction('workbooks', 'readonly');
+    const req = tx.objectStore('workbooks').get('tipout_log');
+    req.onsuccess = function() {
+      if (req.result) {
+        try {
+          const wb = XLSX.read(req.result, {type: 'array'});
+          callback(wb);
+        } catch(e) {
+          callback(XLSX.utils.book_new());
+        }
+      } else {
+        // Try migrating from localStorage
+        const stored = localStorage.getItem('tipout_workbook');
+        if (stored) {
+          try {
+            const binary = atob(stored);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            const wb = XLSX.read(bytes, {type: 'array'});
+            callback(wb);
+          } catch(e) {
+            callback(XLSX.utils.book_new());
+          }
+        } else {
+          callback(XLSX.utils.book_new());
+        }
+      }
+    };
+    req.onerror = function() { callback(XLSX.utils.book_new()); };
+  });
+}
+
+function saveWorkbook(wb, callback) {
+  const data = XLSX.write(wb, {bookType: 'xlsx', type: 'array'});
+  openTipDB(function(db) {
+    if (!db) { if (callback) callback(); return; }
+    const tx = db.transaction('workbooks', 'readwrite');
+    tx.objectStore('workbooks').put(data, 'tipout_log');
+    tx.oncomplete = function() { if (callback) callback(); };
+    tx.onerror = function() { if (callback) callback(); };
+  });
+}
+
+function s2ab(s) {
+  const buf = new ArrayBuffer(s.length);
+  const view = new Uint8Array(buf);
+  for (let i = 0; i < s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
+  return buf;
+}
+
+// ════════════════════════════════════════════
+// Google Sheets Sync
+// ════════════════════════════════════════════
+
+function buildSyncPayload() {
+  const data = calculate();
+  const s = data.settings;
+  const d = s.date ? new Date(s.date + 'T12:00:00') : new Date();
+  const dateStr = (d.getMonth()+1).toString().padStart(2,'0') + '-' + d.getDate().toString().padStart(2,'0') + '-' + d.getFullYear();
+
+  const entries = [];
+
+  // Server remaining tips
+  data.serverResults.forEach(sv => {
+    if (sv.name) entries.push({ name: sv.name, role: 'Server', tips: sv.remaining, type: 'remaining' });
+  });
+
+  // Bartender total tips
+  data.bartenderResults.forEach(b => {
+    if (b.name) entries.push({ name: b.name, role: 'Bartender', tips: b.remaining, type: 'total' });
+  });
+
+  // Busser tipout
+  data.busserResults.forEach(b => {
+    if (b.name) entries.push({ name: b.name, role: 'Busser', tips: b.tipReceived, type: 'tipout' });
+  });
+
+  // Runner tipout
+  data.runnerResults.forEach(r => {
+    if (r.name) entries.push({ name: r.name, role: 'Runner', tips: r.tipReceived, type: 'tipout' });
+  });
+
+  return {
+    date: dateStr,
+    manager: document.getElementById('managerName').value || 'Manager',
+    entries: entries
+  };
+}
+
+// Offline queue using IndexedDB
+function openSyncDB(callback) {
+  const req = indexedDB.open('TipOutSyncDB', 1);
+  req.onupgradeneeded = function(e) {
+    const db = e.target.result;
+    if (!db.objectStoreNames.contains('queue')) {
+      db.createObjectStore('queue', { keyPath: 'id', autoIncrement: true });
+    }
+  };
+  req.onsuccess = function(e) { callback(e.target.result); };
+  req.onerror = function() { callback(null); };
+}
+
+function addToSyncQueue(payload, callback) {
+  openSyncDB(function(db) {
+    if (!db) { if (callback) callback(false); return; }
+    const tx = db.transaction('queue', 'readwrite');
+    tx.objectStore('queue').add({ payload: payload, timestamp: Date.now() });
+    tx.oncomplete = function() { updatePendingCount(); if (callback) callback(true); };
+    tx.onerror = function() { if (callback) callback(false); };
+  });
+}
+
+function getSyncQueue(callback) {
+  openSyncDB(function(db) {
+    if (!db) { callback([]); return; }
+    const tx = db.transaction('queue', 'readonly');
+    const req = tx.objectStore('queue').getAll();
+    req.onsuccess = function() { callback(req.result || []); };
+    req.onerror = function() { callback([]); };
+  });
+}
+
+function clearSyncQueue(callback) {
+  openSyncDB(function(db) {
+    if (!db) { if (callback) callback(); return; }
+    const tx = db.transaction('queue', 'readwrite');
+    tx.objectStore('queue').clear();
+    tx.oncomplete = function() { updatePendingCount(); if (callback) callback(); };
+  });
+}
+
+function updatePendingCount() {
+  getSyncQueue(function(items) {
+    const el = document.getElementById('pendingSyncCount');
+    if (el) {
+      if (items.length > 0) {
+        el.textContent = items.length + ' report(s) waiting to sync';
+        el.style.color = '#ffa726';
+      } else {
+        el.textContent = '';
+      }
+    }
+  });
+}
+
+function syncToGoogleSheets() {
+  const url = (document.getElementById('googleScriptUrl').value || '').trim();
+  if (!url) {
+    alert('Please add your Google Script URL in Settings first.\n\nSee the setup guide for instructions.');
+    return;
+  }
+
+  const hasData = employees.some(e => e.name && (e.svcChg > 0 || e.cash > 0 || e.hours > 0));
+  if (!hasData) {
+    // Try to flush the queue if there's pending data
+    flushSyncQueue(url);
+    return;
+  }
+
+  const payload = buildSyncPayload();
+  const btn = document.getElementById('syncBtn');
+  const btnText = document.getElementById('syncBtnText');
+  btn.disabled = true;
+  btnText.textContent = 'Syncing...';
+
+  const statusEl = document.getElementById('syncStatus');
+
+  // Try to send directly
+  sendToGoogle(url, payload, function(ok, msg) {
+    if (ok) {
+      statusEl.textContent = 'Synced to Google Sheets for ' + payload.date;
+      statusEl.style.color = '#00e676';
+      btnText.textContent = 'Synced!';
+      setTimeout(function() { btnText.textContent = 'Save to Google Sheets'; btn.disabled = false; }, 2000);
+
+      // Also flush any pending items
+      flushSyncQueue(url);
+    } else {
+      // Save to offline queue
+      addToSyncQueue(payload, function() {
+        statusEl.textContent = 'Offline — saved locally. Will sync when connected.';
+        statusEl.style.color = '#ffa726';
+        btnText.textContent = 'Saved offline';
+        setTimeout(function() { btnText.textContent = 'Save to Google Sheets'; btn.disabled = false; }, 2000);
+      });
+    }
+  });
+}
+
+function sendToGoogle(url, payload, callback) {
+  // Encode data as URL parameter and load via script tag (bypasses all CORS)
+  try {
+    var encoded = encodeURIComponent(JSON.stringify(payload));
+    var script = document.createElement('script');
+    script.src = url + '?data=' + encoded + '&callback=tipoutSyncDone&t=' + Date.now();
+
+    window.tipoutSyncDone = function(result) {
+      delete window.tipoutSyncDone;
+      callback(true, 'sent');
+    };
+
+    script.onload = function() {
+      document.head.removeChild(script);
+      // If callback wasn't called by the script, still count as success
+      setTimeout(function() {
+        if (window.tipoutSyncDone) {
+          delete window.tipoutSyncDone;
+          callback(true, 'sent');
+        }
+      }, 2000);
+    };
+
+    script.onerror = function() {
+      document.head.removeChild(script);
+      delete window.tipoutSyncDone;
+      callback(false, 'network error');
+    };
+
+    document.head.appendChild(script);
+  } catch(err) {
+    console.error('Google sync error:', err);
+    callback(false, err.message);
+  }
+}
+
+function flushSyncQueue(url) {
+  getSyncQueue(function(items) {
+    if (items.length === 0) return;
+
+    let sent = 0;
+    items.forEach(function(item) {
+      sendToGoogle(url, item.payload, function(ok) {
+        sent++;
+        if (sent === items.length) {
+          clearSyncQueue();
+          var statusEl = document.getElementById('syncStatus');
+          if (statusEl) {
+            statusEl.textContent = 'Synced ' + items.length + ' queued report(s) to Google Sheets';
+            statusEl.style.color = '#00e676';
+          }
+        }
+      });
+    });
+  });
+}
+
+// Auto-sync when coming back online
+window.addEventListener('online', function() {
+  const url = (document.getElementById('googleScriptUrl').value || '').trim();
+  if (url) {
+    flushSyncQueue(url);
+  }
+});
+
+// Register service worker for offline support
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(function(err) {
+    console.log('SW registration skipped:', err.message);
+  });
+}
+
+init();
+initParty();
+loadGoogleUrl();
+updatePendingCount();
+</script>
+</body>
+</html>
