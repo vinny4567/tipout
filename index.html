@@ -1223,8 +1223,8 @@ function calculateParty() {
   const partyHasBussers = bussers.length > 0;
   const partyHasBartenders = bartenders.length > 0;
       // Party tip split: servers 70%, bussers 20%, bartenders 10%
-      var busserPool = hasBussers ? Math.floor(totalTip * 0.20 * 100) / 100 : 0;
-      var barPool = hasBartenders ? Math.floor(totalTip * 0.10 * 100) / 100 : 0;
+      var busserPool = partyHasBussers ? Math.floor(totalTip * 0.20 * 100) / 100 : 0;
+      var barPool = partyHasBartenders ? Math.floor(totalTip * 0.10 * 100) / 100 : 0;
       var serverKeep = Math.floor((totalTip - busserPool - barPool) * 100) / 100;
       var perServer = servers.length > 0 ? Math.floor((serverKeep / servers.length) * 100) / 100 : 0;
       var perBartender = bartenders.length > 0 ? Math.floor((barPool / bartenders.length) * 100) / 100 : 0;
