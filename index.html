@@ -1222,21 +1222,13 @@ function calculateParty() {
   // 20% always comes off if bartenders are present
   const partyHasBussers = bussers.length > 0;
   const partyHasBartenders = bartenders.length > 0;
-  const tipoutAmount = partyHasBartenders ? Math.floor(totalTip * s.tipoutPct * 100) / 100 : 0;
-  const barPool = partyHasBartenders ? Math.floor(tipoutAmount * s.barShare * 100) / 100 : 0;
-  const busserPool = partyHasBussers ? Math.floor(tipoutAmount * s.busserShare * 100) / 100 : 0;
-  // Servers keep total minus only what actually goes out
-  const serverKeep = Math.floor((totalTip - barPool - busserPool) * 100) / 100;
-
-  // Server split: even among servers
-  const perServer = servers.length > 0 ? Math.floor((serverKeep / servers.length) * 100) / 100 : 0;
-
-  // Bartender split: even
-  const perBartender = bartenders.length > 0 ? Math.floor((barPool / bartenders.length) * 100) / 100 : 0;
-
-  // Busser split: by hours
-  const totalBusserHours = bussers.reduce((s, b) => s + b.hours, 0);
-  const busserRate = totalBusserHours > 0 ? busserPool / totalBusserHours : 0;
+      // Party tip split: servers 70%, bussers 20%, bartenders 10%
+      var busserPool = hasBussers ? Math.floor(totalTip * 0.20 * 100) / 100 : 0;
+      var barPool = hasBartenders ? Math.floor(totalTip * 0.10 * 100) / 100 : 0;
+      var serverKeep = Math.floor((totalTip - busserPool - barPool) * 100) / 100;
+      var perServer = servers.length > 0 ? Math.floor((serverKeep / servers.length) * 100) / 100 : 0;
+      var perBartender = bartenders.length > 0 ? Math.floor((barPool / bartenders.length) * 100) / 100 : 0;
+      var perBusser = bussers.length > 0 ? Math.floor((busserPool / bussers.length) * 100) / 100 : 0;
 
   let html = '';
 
@@ -1261,9 +1253,9 @@ function calculateParty() {
   // Bussers
   if (bussers.length > 0) {
     html += `<div class="report-jobcode" style="margin-top:16px;">Bussers</div>`;
-    html += `<div class="dist-pool">Busser pool: <strong>$${fmt(busserPool)}</strong> &middot; $${fmt(Math.floor(busserRate * 100) / 100)}/hr</div>`;
+    html += `<div class="dist-pool">Busser pool: <strong>$${fmt(busserPool)}</strong> &middot; $${fmt(Math.floor(perBusser * 100) / 100)}/hr</div>`;
     bussers.forEach(b => {
-      const pay = Math.floor(b.hours * busserRate * 100) / 100;
+      const pay = perBusser;
       html += `<div class="dist-row"><div><span class="name">${b.name}</span><span class="hours">${b.hours} hrs</span></div><span class="amount">$${fmt(pay)}</span></div>`;
     });
   }
@@ -1271,7 +1263,7 @@ function calculateParty() {
   // Summary
   html += `<div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border);">
     <div class="dist-row"><span style="color:var(--text-dim);">Total Party Tip</span><span class="amount">$${fmt(totalTip)}</span></div>
-    <div class="dist-row"><span style="color:var(--text-dim);">${Math.round(s.tipoutPct * 100)}% Tipout</span><span style="font-weight:600;">$${fmt(tipoutAmount)}</span></div>
+    <div class="dist-row"><span style="color:var(--text-dim);">${Math.round(s.0.30 * 100)}% Tipout</span><span style="font-weight:600;">$${fmt(tipoutAmount)}</span></div>
   </div>`;
 
   document.getElementById('partyResults').innerHTML = html;
@@ -1307,28 +1299,19 @@ function clearParty() {
 
       var partyHasBussers = bussers.length > 0;
       var partyHasBartenders = bartenders.length > 0;
-      var tipoutAmount = partyHasBartenders ? Math.floor(totalTip * s.tipoutPct * 100) / 100 : 0;
-      var barPool = partyHasBartenders ? Math.floor(tipoutAmount * s.barShare * 100) / 100 : 0;
-      var busserPool = partyHasBussers ? Math.floor(tipoutAmount * s.busserShare * 100) / 100 : 0;
-      var serverKeep = Math.floor((totalTip - barPool - busserPool) * 100) / 100;
-
+      // Party tip split: servers 70%, bussers 20%, bartenders 10%
+      var busserPool = partyHasBussers ? Math.floor(totalTip * 0.20 * 100) / 100 : 0;
+      var barPool = partyHasBartenders ? Math.floor(totalTip * 0.10 * 100) / 100 : 0;
+      var serverKeep = Math.floor((totalTip - busserPool - barPool) * 100) / 100;
       var perServer = servers.length > 0 ? Math.floor((serverKeep / servers.length) * 100) / 100 : 0;
       var perBartender = bartenders.length > 0 ? Math.floor((barPool / bartenders.length) * 100) / 100 : 0;
-      var totalBusserHours = bussers.reduce(function(sum, b) { return sum + b.hours; }, 0);
-      var busserRate = totalBusserHours > 0 ? busserPool / totalBusserHours : 0;
-
+      var perBusser = bussers.length > 0 ? Math.floor((busserPool / bussers.length) * 100) / 100 : 0;
       var entries = [];
-      servers.forEach(function(sv) {
-        entries.push({ name: sv.name, role: 'Server', tips: perServer, type: 'remaining' });
-      });
-      bartenders.forEach(function(b) {
-        entries.push({ name: b.name, role: 'Bartender', tips: perBartender, type: 'total' });
-      });
+      servers.forEach(function(sv) { entries.push({ name: sv.name, role: 'Server', tips: perServer, type: 'remaining' }); });
+      bartenders.forEach(function(b) { entries.push({ name: b.name, role: 'Bartender', tips: perBartender, type: 'total' }); });
       bussers.forEach(function(b) {
-        var pay = Math.floor(b.hours * busserRate * 100) / 100;
-        entries.push({ name: b.name, role: 'Busser', tips: pay, type: 'tipout' });
+        entries.push({ name: b.name, role: 'Busser', tips: perBusser, type: 'tipout' });
       });
-
       if (entries.length === 0) { alert('No employees selected for the party.'); return; }
 
       var payload = {
