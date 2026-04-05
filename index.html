@@ -468,9 +468,9 @@
   }
 
   /* Hide number spinners */
-  input[type="number"]::-webkit-inner-spin-button,
-  input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-  input[type="number"] { -moz-appearance: textfield; }
+  input[type="number" inputmode="numeric" pattern="[0-9]*"]::-webkit-inner-spin-button,
+  input[type="number" inputmode="numeric" pattern="[0-9]*"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type="number" inputmode="numeric" pattern="[0-9]*"] { -moz-appearance: textfield; }
 </style>
 </head>
 <body>
@@ -499,19 +499,19 @@
       <div class="settings-grid">
         <div class="setting-item">
           <label>Server Tipout %</label>
-          <input type="number" class="setting-input" id="tipoutPct" value="20" min="0" max="100" step="1" oninput="saveSettings()">
+          <input type="number" inputmode="numeric" pattern="[0-9]*" class="setting-input" id="tipoutPct" value="20" min="0" max="100" step="1" oninput="saveSettings()">
         </div>
         <div class="setting-item">
           <label>Runner $ per $100 earned</label>
-          <input type="number" class="setting-input" id="runnerPer100" value="5.00" min="0" step="0.50" oninput="saveSettings()">
+          <input type="number" inputmode="numeric" pattern="[0-9]*" class="setting-input" id="runnerPer100" value="5.00" min="0" step="0.50" oninput="saveSettings()">
         </div>
         <div class="setting-item">
           <label>Busser Share of Tipout %</label>
-          <input type="number" class="setting-input" id="busserShare" value="75" min="0" max="100" step="1" oninput="saveSettings()">
+          <input type="number" inputmode="numeric" pattern="[0-9]*" class="setting-input" id="busserShare" value="75" min="0" max="100" step="1" oninput="saveSettings()">
         </div>
         <div class="setting-item">
           <label>Bar Share of Tipout %</label>
-          <input type="number" class="setting-input" id="barShare" value="25" min="0" max="100" step="1" oninput="saveSettings()">
+          <input type="number" inputmode="numeric" pattern="[0-9]*" class="setting-input" id="barShare" value="25" min="0" max="100" step="1" oninput="saveSettings()">
         </div>
       </div>
     </div>
@@ -605,7 +605,7 @@
           <label>Total Party Tip</label>
           <div style="position:relative;">
             <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;font-weight:600;color:var(--text-dim);">$</span>
-            <input type="text" inputmode="decimal" class="setting-input" id="partyTip" placeholder="0.00" style="padding-left:28px;"
+            <input type="text" inputmode="numeric" pattern="[0-9]*" class="setting-input" id="partyTip" placeholder="0.00" style="padding-left:28px;"
               onchange="calculateParty()">
           </div>
         </div>
@@ -798,25 +798,25 @@ function renderEmployees() {
           ${(e.role === 'Busser' || e.role === 'Runner') ? `
           <div class="emp-field">
             <label>Hours</label>
-            <input type="text" inputmode="decimal" value="${e.hours || ''}" placeholder="0.00"
+            <input type="text" inputmode="numeric" pattern="[0-9]*" value="${e.hours || ''}" placeholder="0.00"
               ${!e.name ? 'disabled' : ''} onchange="updateEmployee(${e.id}, 'hours', this.value)">
           </div>` : ''}
           ${(e.role === 'Server') ? `
           <div class="emp-field">
             <label>Svc Chg (CC Tips)</label>
-            <input type="text" inputmode="decimal" value="${e.svcChg || ''}" placeholder="0.00"
+            <input type="text" inputmode="numeric" pattern="[0-9]*" value="${e.svcChg || ''}" placeholder="0.00"
               ${!e.name ? 'disabled' : ''} onchange="updateEmployee(${e.id}, 'svcChg', this.value)">
           </div>` : ''}
           ${(e.role === 'Server') ? `
           <div class="emp-field">
             <label>Cash Tips</label>
-            <input type="text" inputmode="decimal" value="${e.cash || ''}" placeholder="0.00"
+            <input type="text" inputmode="numeric" pattern="[0-9]*" value="${e.cash || ''}" placeholder="0.00"
               ${!e.name ? 'disabled' : ''} onchange="updateEmployee(${e.id}, 'cash', this.value); updateTotal(${e.id})">
           </div>` : ''}
           ${(e.role === 'Bartender') ? `
           <div class="emp-field">
             <label>Tips</label>
-            <input type="text" inputmode="decimal" value="${e.cash || ''}" placeholder="0.00"
+            <input type="text" inputmode="numeric" pattern="[0-9]*" value="${e.cash || ''}" placeholder="0.00"
               ${!e.name ? 'disabled' : ''} onchange="updateEmployee(${e.id}, 'cash', this.value)">
           </div>` : ''}
           ${e.role === 'Server' ? `
@@ -1201,7 +1201,7 @@ function renderPartyEmployees() {
         <div class="emp-row-bottom">
           <div class="emp-field">
             <label>Hours</label>
-            <input type="text" inputmode="decimal" value="${e.hours || ''}" placeholder="0.00"
+            <input type="text" inputmode="numeric" pattern="[0-9]*" value="${e.hours || ''}" placeholder="0.00"
               onchange="updatePartyEmployee(${e.id}, 'hours', this.value)">
           </div>
         </div>` : ''}
