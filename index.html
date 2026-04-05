@@ -594,6 +594,7 @@
 
   <!-- PRIVATE PARTY PANEL -->
   <div class="panel" id="panel-party">
+    <button class="btn btn-outline" style="width:100%; margin-bottom:16px;" onclick="clearParty()">Clear All</button>
     <div class="card">
       <div class="card-title">Party Info</div>
       <div class="settings-grid">
@@ -637,7 +638,6 @@
 
     <div class="btn-row">
       <button class="btn btn-primary" onclick="calculateParty()">Calculate Party Tipout</button>
-      <button class="btn btn-outline btn-danger" onclick="clearParty()">Clear Party</button>
     </div>
     <div style="margin-top:12px; text-align:center;">
       <button id="partySyncBtn" class="btn btn-primary" onclick="syncPartyToGoogleSheets()" style="width:100%; background:#1a73e8;">
