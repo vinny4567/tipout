@@ -807,12 +807,7 @@ function renderEmployees() {
             <input type="text" inputmode="numeric" pattern="[0-9]*" value="${e.svcChg || ''}" placeholder="0.00"
               ${!e.name ? 'disabled' : ''} onchange="updateEmployee(${e.id}, 'svcChg', this.value); updateTotal(${e.id})">
           </div>` : ''}
-          ${(e.role === 'Bartender') ? `
-          <div class="emp-field">
-            <label>Tips</label>
-            <input type="text" inputmode="numeric" pattern="[0-9]*" value="${e.cash || ''}" placeholder="0.00"
-              ${!e.name ? 'disabled' : ''} onchange="updateEmployee(${e.id}, 'cash', this.value)">
-          </div>` : ''}
+          
           ${e.role === 'Server' ? `
           <div class="emp-field">
             <label>Total</label>
