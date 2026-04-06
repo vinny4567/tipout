@@ -1255,7 +1255,7 @@ function calculateParty() {
   // Summary
   html += `<div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--border);">
     <div class="dist-row"><span style="color:var(--text-dim);">Total Party Tip</span><span class="amount">$${fmt(totalTip)}</span></div>
-    <div class="dist-row"><span style="color:var(--text-dim);">${Math.round(0.30 * 100)}% Tipout</span><span style="font-weight:600;">$${fmt(tipoutAmount)}</span></div>
+    <div class="dist-row"><span style="color:var(--text-dim);">${Math.round(0.30 * 100)}% Tipout</span><span style="font-weight:600;">$${fmt((busserPool + barPool))}</span></div>
   </div>`;
 
   document.getElementById('partyResults').innerHTML = html;
