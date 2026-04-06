@@ -878,7 +878,7 @@ function calculate() {
     const runnerTipout = hasRunners ? Math.floor(totalTips / 100) * s.runnerPer100 : 0;
     const adjustedTotal = totalTips - runnerTipout;
     // 20% always comes off if bartenders are on shift (they always get tipped)
-    const twentyPctTipout = hasBartenders ? Math.floor(adjustedTotal * s.tipoutPct * 100) / 100 : 0;
+    const twentyPctTipout = (hasBartenders || hasBussers) ? Math.floor(adjustedTotal * s.tipoutPct * 100) / 100 : 0;
     // Bar always gets their cut if bartenders are present
     const barTipout = hasBartenders ? Math.floor(twentyPctTipout * s.barShare * 100) / 100 : 0;
     // Bussers only get their cut if bussers are on shift; otherwise servers keep it
