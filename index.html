@@ -779,7 +779,7 @@ function renderEmployees() {
     const roleEmps = employees.filter(e => e.role === role);
     const takenNames = employees.map(e => e.name).filter(n => n);
     list.innerHTML = roleEmps.map(e => {
-      const names = Object.values(roster).flat();
+      const names = roster[role] || [];
       const nameOptions = names
         .map(n => {
           const taken = n !== e.name && takenNames.includes(n);
