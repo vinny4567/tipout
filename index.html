@@ -12,7 +12,7 @@
 <title>Tip-Out Calculator</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-  :root {
+  :root 
     --bg: #0f1117;
     --surface: #1a1d27;
     --surface2: #242836;
@@ -803,15 +803,9 @@ function renderEmployees() {
           </div>` : ''}
           ${(e.role === 'Server') ? `
           <div class="emp-field">
-            <label>Svc Chg (CC Tips)</label>
+            <label>Tips</label>
             <input type="text" inputmode="numeric" pattern="[0-9]*" value="${e.svcChg || ''}" placeholder="0.00"
-              ${!e.name ? 'disabled' : ''} onchange="updateEmployee(${e.id}, 'svcChg', this.value)">
-          </div>` : ''}
-          ${(e.role === 'Server') ? `
-          <div class="emp-field">
-            <label>Cash Tips</label>
-            <input type="text" inputmode="numeric" pattern="[0-9]*" value="${e.cash || ''}" placeholder="0.00"
-              ${!e.name ? 'disabled' : ''} onchange="updateEmployee(${e.id}, 'cash', this.value); updateTotal(${e.id})">
+              ${!e.name ? 'disabled' : ''} onchange="updateEmployee(${e.id}, 'svcChg', this.value); updateTotal(${e.id})">
           </div>` : ''}
           ${(e.role === 'Bartender') ? `
           <div class="emp-field">
@@ -988,7 +982,7 @@ function generateReport() {
     html += `<div class="report-section"><div class="report-jobcode">Job code: Busser</div>`;
     html += `<table class="report-table">
       <tr>
-        <th></th><th>Total<br>Hours</th><th>Total Svc<br>Chg</th><th>Cash<br>Tips</th>
+        <th></th><th>Total<br>Hours</th><th>Tips</th>
         <th>Runner<br>TipOut</th><th>${pctLabel}<br>Tipout</th><th>Bar<br>Tipout</th>
         <th>Busser<br>Tipout</th><th>Remaining<br>Tips</th>
       </tr>`;
@@ -1012,7 +1006,7 @@ function generateReport() {
     html += `<div class="report-section"><div class="report-jobcode">Job code: Runner</div>`;
     html += `<table class="report-table">
       <tr>
-        <th></th><th>Total<br>Hours</th><th>Total Svc<br>Chg</th><th>Cash<br>Tips</th>
+        <th></th><th>Total<br>Hours</th><th>Tips</th>
         <th>Runner<br>TipOut</th><th>${pctLabel}<br>Tipout</th><th>Bar<br>Tipout</th>
         <th>Busser<br>Tipout</th><th>Remaining<br>Tips</th>
       </tr>`;
@@ -1036,7 +1030,7 @@ function generateReport() {
     html += `<div class="report-section"><div class="report-jobcode">Job code: Server</div>`;
     html += `<table class="report-table">
       <tr>
-        <th></th><th>Total Svc<br>Chg</th><th>Cash<br>Tips</th>
+        <th></th><th>Tips</th>
         <th>Runner<br>TipOut</th><th>${pctLabel}<br>Tipout</th><th>Bar<br>Tipout</th>
         <th>Busser<br>Tipout</th><th>Remaining<br>Tips</th>
       </tr>`;
@@ -1047,15 +1041,13 @@ function generateReport() {
       totRunner += sv.runnerTipout; totPct += sv.twentyPctTipout;
       totBar += sv.barTipout; totBusser += sv.busserTipout; totRemain += sv.remaining;
       html += `<tr>
-        <td>${sv.name || 'Unnamed'}</td><td>${fmt(sv.svcChg)}</td>
-        <td>${fmt(sv.cash)}</td><td>${fmt(sv.runnerTipout)}</td><td>${fmt(sv.twentyPctTipout)}</td>
+        <td>${sv.name || 'Unnamed'}</td><td>${fmt(sv.svcChg + sv.cash)}</td><td>${fmt(sv.runnerTipout)}</td><td>${fmt(sv.twentyPctTipout)}</td>
         <td>${fmt(sv.barTipout)}</td><td></td>
         <td class="remaining-col">${fmt(sv.remaining)}</td>
       </tr>`;
     });
     html += `<tr class="total-row">
-      <td>Server Total</td><td>${fmt(totS)}</td>
-      <td>${fmt(totCash)}</td><td>${fmt(totRunner)}</td><td>${fmt(totPct)}</td>
+      <td>Server Total</td><td>${fmt(totS + totCash)}</td><td>${fmt(totRunner)}</td><td>${fmt(totPct)}</td>
       <td>${fmt(totBar)}</td><td>${fmt(totBusser)}</td>
       <td class="remaining-col">${fmt(totRemain)}</td>
     </tr></table></div>`;
@@ -1369,14 +1361,14 @@ function saveToSpreadsheet() {
     // Servers
     if (data.serverResults.length > 0) {
       rows.push(['SERVERS']);
-      rows.push(['Name', 'Svc Chg', 'Cash Tips', 'Runner TipOut', '20% TipOut', 'Bar TipOut', 'Busser TipOut', 'Remaining']);
+      rows.push(['Name', 'Tips', 'Runner TipOut', '20% TipOut', 'Bar TipOut', 'Busser TipOut', 'Remaining']);
       let totS=0, totC=0, totR=0, tot20=0, totB=0, totBu=0, totRem=0;
       data.serverResults.forEach(sv => {
         totS+=sv.svcChg; totC+=sv.cash; totR+=sv.runnerTipout; tot20+=sv.twentyPctTipout;
         totB+=sv.barTipout; totBu+=sv.busserTipout; totRem+=sv.remaining;
-        rows.push([sv.name, sv.svcChg, sv.cash, sv.runnerTipout, sv.twentyPctTipout, sv.barTipout, sv.busserTipout, sv.remaining]);
+        rows.push([sv.name, sv.svcChg + sv.cash, sv.runnerTipout, sv.twentyPctTipout, sv.barTipout, sv.busserTipout, sv.remaining]);
       });
-      rows.push(['Server Total', totS, totC, totR, tot20, totB, totBu, totRem]);
+      rows.push(['Server Total', totS + totC, totR, tot20, totB, totBu, totRem]);
       rows.push([]);
     }
 
