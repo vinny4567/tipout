@@ -89,9 +89,9 @@
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 14px;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 8px;
   }
 
   .card-title {
@@ -143,10 +143,13 @@
   /* Employee entry */
   .employee-entry {
     background: var(--surface2);
-    border-radius: 10px;
-    padding: 12px;
-    margin-bottom: 8px;
+    border-radius: 6px;
+    padding: 6px 8px;
+    margin-bottom: 3px;
     animation: slideIn 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
   @keyframes slideIn {
     from { opacity: 0; transform: translateY(-6px); }
@@ -155,19 +158,21 @@
 
   .emp-row-top {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
-    margin-bottom: 8px;
+    margin-bottom: 0;
+    flex: 1;
+    min-width: 0;
   }
 
   .emp-name {
     flex: 1;
-    padding: 8px 10px;
+    padding: 5px 8px;
     background: var(--bg);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 6px;
     color: var(--text);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     outline: none;
     cursor: pointer;
@@ -190,8 +195,8 @@
   .emp-role-select:focus { border-color: var(--accent); }
 
   .emp-remove {
-    width: 32px;
-    height: 32px;
+    width: 26px;
+    height: 26px;
     border-radius: 8px;
     border: none;
     background: transparent;
@@ -207,8 +212,8 @@
 
   .emp-row-bottom {
     display: flex;
-    gap: 8px;
-    justify-content: flex-end;
+    gap: 6px;
+    align-items: center;
   }
 
   .emp-row-extra {
@@ -220,17 +225,17 @@
 
   .emp-field label {
     display: block;
-    font-size: 10px;
+    font-size: 9px;
     color: var(--text-muted);
-    margin-bottom: 3px;
+    margin-bottom: 1px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     font-weight: 600;
   }
 
   .emp-field input {
-    width: 100px;
-    padding: 7px 8px;
+    width: 70px;
+    padding: 5px 6px;
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 6px;
@@ -391,9 +396,9 @@
 
   .btn {
     flex: 1;
-    padding: 14px;
-    border-radius: 10px;
-    font-size: 14px;
+    padding: 8px;
+    border-radius: 8px;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     border: none;
