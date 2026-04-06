@@ -1272,6 +1272,13 @@ function clearParty() {
 }
 
     function syncPartyToGoogleSheets() {
+      var btnText = document.getElementById('partySyncBtnText');
+      if (btnText.textContent !== 'Are you sure?') {
+        btnText.textContent = 'Are you sure?';
+        setTimeout(function() { btnText.textContent = 'Save Party to Google Sheets'; }, 3000);
+        return;
+      }
+      btnText.textContent = 'Save Party to Google Sheets';
       var url = (document.getElementById('googleScriptUrl').value || '').trim();
       if (!url) {
         alert('Please add your Google Script URL in Settings first.\n\nSee the setup guide for instructions.');
@@ -1628,6 +1635,13 @@ function updatePendingCount() {
 }
 
 function syncToGoogleSheets() {
+  var btnText = document.getElementById('syncBtnText');
+  if (btnText.textContent !== 'Are you sure?') {
+    btnText.textContent = 'Are you sure?';
+    setTimeout(function() { btnText.textContent = 'Save to Google Sheets'; }, 3000);
+    return;
+  }
+  btnText.textContent = 'Save to Google Sheets';
   const url = (document.getElementById('googleScriptUrl').value || '').trim();
   if (!url) {
     alert('Please add your Google Script URL in Settings first.\n\nSee the setup guide for instructions.');
