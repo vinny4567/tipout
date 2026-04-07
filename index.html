@@ -483,6 +483,65 @@
   input[type="number" inputmode="numeric" pattern="[0-9]*"]::-webkit-inner-spin-button,
   input[type="number" inputmode="numeric" pattern="[0-9]*"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
   input[type="number" inputmode="numeric" pattern="[0-9]*"] { -moz-appearance: textfield; }
+
+  /* Custom Dialpad */
+  .dialpad-overlay {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 12px 12px 24px;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.5);
+  }
+  .dialpad-overlay.active { display: block; }
+  .dialpad-display {
+    text-align: right;
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text);
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    background: var(--surface2);
+    border-radius: 10px;
+    min-height: 48px;
+  }
+  .dialpad-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    max-width: 400px;
+    margin: 0 auto;
+  }
+  .dialpad-btn {
+    height: 56px;
+    border-radius: 12px;
+    border: none;
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 22px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .dialpad-btn:active { background: var(--border); }
+  .dialpad-btn.done {
+    background: #4285f4;
+    color: white;
+  }
+  .dialpad-btn.done:active { background: #3367d6; }
+  .dialpad-btn.backspace { font-size: 18px; }
+  .dialpad-scrim {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 9998;
+    background: rgba(0,0,0,0.3);
+  }
+  .dialpad-scrim.active { display: block; }
 </style>
 </head>
 <body>
@@ -1845,6 +1904,74 @@ init();
 initParty();
 loadGoogleUrl();
 updatePendingCount();
+// --- Custom Dialpad ---
+var dialpadTarget = null;
+var dialpadValue = '';
+var dialpadCallback = null;
+
+function openDialpad(input) {
+  dialpadTarget = input;
+  dialpadValue = input.value || '';
+  document.getElementById('dialpadDisplay').textContent = dialpadValue || '0';
+  document.getElementById('dialpadOverlay').classList.add('active');
+  document.getElementById('dialpadScrim').classList.add('active');
+  input.blur();
+}
+
+function closeDialpad() {
+  if (dialpadTarget) {
+    dialpadTarget.value = dialpadValue;
+    dialpadTarget.dispatchEvent(new Event('change'));
+  }
+  dialpadTarget = null;
+  dialpadValue = '';
+  document.getElementById('dialpadOverlay').classList.remove('active');
+  document.getElementById('dialpadScrim').classList.remove('active');
+}
+
+function dialpadPress(key) {
+  if (key === 'backspace') {
+    dialpadValue = dialpadValue.slice(0, -1);
+  } else if (key === '.') {
+    if (!dialpadValue.includes('.')) {
+      dialpadValue += dialpadValue ? '.' : '0.';
+    }
+  } else {
+    if (dialpadValue === '0' && key !== '.') dialpadValue = '';
+    dialpadValue += key;
+  }
+  document.getElementById('dialpadDisplay').textContent = dialpadValue || '0';
+}
+
+// Intercept focus on numeric inputs to show dialpad instead of keyboard
+document.addEventListener('focus', function(e) {
+  var el = e.target;
+  if (el.tagName === 'INPUT' && el.getAttribute('inputmode') === 'numeric' && !el.readOnly && !el.closest('#panel-settings')) {
+    e.preventDefault();
+    el.blur();
+    setTimeout(function() { openDialpad(el); }, 50);
+  }
+}, true);
 </script>
+
+<div class="dialpad-scrim" id="dialpadScrim" onclick="closeDialpad()"></div>
+<div class="dialpad-overlay" id="dialpadOverlay">
+  <div class="dialpad-display" id="dialpadDisplay">0</div>
+  <div class="dialpad-grid">
+    <button class="dialpad-btn" onclick="dialpadPress('1')">1</button>
+    <button class="dialpad-btn" onclick="dialpadPress('2')">2</button>
+    <button class="dialpad-btn" onclick="dialpadPress('3')">3</button>
+    <button class="dialpad-btn" onclick="dialpadPress('4')">4</button>
+    <button class="dialpad-btn" onclick="dialpadPress('5')">5</button>
+    <button class="dialpad-btn" onclick="dialpadPress('6')">6</button>
+    <button class="dialpad-btn" onclick="dialpadPress('7')">7</button>
+    <button class="dialpad-btn" onclick="dialpadPress('8')">8</button>
+    <button class="dialpad-btn" onclick="dialpadPress('9')">9</button>
+    <button class="dialpad-btn" onclick="dialpadPress('.')">.</button>
+    <button class="dialpad-btn" onclick="dialpadPress('0')">0</button>
+    <button class="dialpad-btn backspace" onclick="dialpadPress('backspace')">&larr;</button>
+    <button class="dialpad-btn done" style="grid-column: 1 / -1;" onclick="closeDialpad()">Done</button>
+  </div>
+</div>
 </body>
 </html>
