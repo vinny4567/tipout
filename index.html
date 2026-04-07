@@ -958,12 +958,6 @@ function renderEmployees() {
               ${!e.name ? 'disabled' : ''} onchange="updateEmployee(${e.id}, 'svcChg', this.value); updateTotal(${e.id})">
           </div>` : ''}
           
-          ${e.role === 'Server' ? `
-          <div class="emp-field">
-            <label>Total</label>
-            <input type="text" id="total-${e.id}" value="${(e.svcChg + e.cash) ? '$' + (Math.round((e.svcChg + e.cash) * 100) / 100).toFixed(2) : ''}"
-              readonly style="width:100px; color:var(--green); background:var(--surface); border-color:transparent; cursor:default;">
-          </div>` : ''}
         </div>
       </div>`;
     }).join('');
