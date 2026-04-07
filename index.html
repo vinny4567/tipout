@@ -706,6 +706,17 @@ function sortByFirst(a, b) {
   // Actually names are "First Last", so split by space and take first part
   return a.split(' ')[0].localeCompare(b.split(' ')[0]);
 }
+// Load custom roster additions from localStorage
+try {
+  const custom = JSON.parse(localStorage.getItem('customRoster') || '{}');
+  Object.keys(custom).forEach(role => {
+    if (roster[role]) {
+      custom[role].forEach(name => {
+        if (!roster[role].includes(name)) roster[role].push(name);
+      });
+    }
+  });
+} catch(e) {}
 Object.keys(roster).forEach(r => roster[r].sort(sortByFirst));
 
 function init() {
@@ -732,9 +743,17 @@ function addToRoster() {
   if (!roster[role].includes(name)) {
     roster[role].push(name);
     roster[role].sort(sortByFirst);
+    // Save custom addition to localStorage
+    try {
+      const custom = JSON.parse(localStorage.getItem('customRoster') || '{}');
+      if (!custom[role]) custom[role] = [];
+      if (!custom[role].includes(name)) custom[role].push(name);
+      localStorage.setItem('customRoster', JSON.stringify(custom));
+    } catch(e) {}
   }
   nameInput.value = '';
   renderEmployees();
+  renderPartyEmployees();
 }
 
 function addEmployee(role = 'Server') {
