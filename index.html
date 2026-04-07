@@ -210,6 +210,13 @@
   }
   .emp-remove:hover { background: var(--red-light); color: var(--red); }
 
+  .roster-role-title { font-size: 13px; font-weight: 600; color: var(--text-dim); margin: 12px 0 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .roster-role-title:first-child { margin-top: 0; }
+  .roster-name { display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; border-radius: 6px; font-size: 14px; color: var(--text); }
+  .roster-name:hover { background: var(--surface2); }
+  .roster-name button { width: 22px; height: 22px; border-radius: 6px; border: none; background: transparent; color: var(--text-muted); font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .roster-name button:hover { background: var(--red-light); color: var(--red); }
+
   .emp-row-bottom {
     display: flex;
     gap: 6px;
@@ -548,6 +555,11 @@
       </div>
       <div id="pendingSyncCount" style="font-size:12px; color:#ffa726; margin-top:6px;"></div>
     </div>
+
+    <div class="card">
+      <div class="card-title">Manage Roster</div>
+      <div id="rosterManager"></div>
+    </div>
   </div>
 
   <!-- EMPLOYEE INPUT PANEL -->
@@ -706,6 +718,15 @@ function sortByFirst(a, b) {
   // Actually names are "First Last", so split by space and take first part
   return a.split(' ')[0].localeCompare(b.split(' ')[0]);
 }
+// Remove deleted defaults from roster
+try {
+  const removed = JSON.parse(localStorage.getItem('removedRoster') || '{}');
+  Object.keys(removed).forEach(role => {
+    if (roster[role]) {
+      roster[role] = roster[role].filter(n => !removed[role].includes(n));
+    }
+  });
+} catch(e) {}
 // Load custom roster additions from localStorage
 try {
   const custom = JSON.parse(localStorage.getItem('customRoster') || '{}');
@@ -732,6 +753,7 @@ function init() {
   for (let i = 0; i < 5; i++) employees.push({ id: nextId++, name: '', role: 'Busser', hours: 0, svcChg: 0, cash: 0 });
 
   renderEmployees();
+  renderRoster();
 }
 
 function addToRoster() {
@@ -750,8 +772,52 @@ function addToRoster() {
       if (!custom[role].includes(name)) custom[role].push(name);
       localStorage.setItem('customRoster', JSON.stringify(custom));
     } catch(e) {}
+    // Remove from deleted list if re-adding
+    try {
+      const removed = JSON.parse(localStorage.getItem('removedRoster') || '{}');
+      if (removed[role]) {
+        removed[role] = removed[role].filter(n => n !== name);
+        localStorage.setItem('removedRoster', JSON.stringify(removed));
+      }
+    } catch(e) {}
   }
   nameInput.value = '';
+  renderEmployees();
+  renderPartyEmployees();
+  renderRoster();
+}
+
+function renderRoster() {
+  const el = document.getElementById('rosterManager');
+  if (!el) return;
+  let html = '';
+  ['Server', 'Bartender', 'Busser', 'Runner'].forEach(role => {
+    html += `<div class="roster-role-title">${role}s</div>`;
+    roster[role].forEach(name => {
+      html += `<div class="roster-name"><span>${name}</span><button onclick="removeFromRoster('${role}','${name.replace(/'/g, "\\'")}')">&times;</button></div>`;
+    });
+  });
+  el.innerHTML = html;
+}
+
+function removeFromRoster(role, name) {
+  roster[role] = roster[role].filter(n => n !== name);
+  // Update localStorage custom roster
+  try {
+    const custom = JSON.parse(localStorage.getItem('customRoster') || '{}');
+    if (custom[role]) {
+      custom[role] = custom[role].filter(n => n !== name);
+      localStorage.setItem('customRoster', JSON.stringify(custom));
+    }
+  } catch(e) {}
+  // Also track removed default names so they don't come back on reload
+  try {
+    const removed = JSON.parse(localStorage.getItem('removedRoster') || '{}');
+    if (!removed[role]) removed[role] = [];
+    if (!removed[role].includes(name)) removed[role].push(name);
+    localStorage.setItem('removedRoster', JSON.stringify(removed));
+  } catch(e) {}
+  renderRoster();
   renderEmployees();
   renderPartyEmployees();
 }
