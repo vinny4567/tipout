@@ -1446,7 +1446,7 @@ function clearParty() {
       var perBusser = bussers.length > 0 ? Math.floor((busserPool / bussers.length) * 100) / 100 : 0;
       var entries = [];
       servers.forEach(function(sv) { entries.push({ name: sv.name, role: 'Server', tips: perServer, type: 'remaining' }); });
-      bartenders.forEach(function(b) { entries.push({ name: b.name, role: 'Bartender', tips: perBartender, type: 'total' }); });
+      // bartenders.forEach(function(b) { entries.push({ name: b.name, role: 'Bartender', tips: perBartender, type: 'total' }); });
       bussers.forEach(function(b) {
         entries.push({ name: b.name, role: 'Busser', tips: perBusser, type: 'tipout' });
       });
@@ -1696,9 +1696,9 @@ function buildSyncPayload() {
   });
 
   // Bartender total tips
-  data.bartenderResults.forEach(b => {
-    if (b.name) entries.push({ name: b.name, role: 'Bartender', tips: b.remaining, type: 'total' });
-  });
+  // data.bartenderResults.forEach(b => {
+  //   if (b.name) entries.push({ name: b.name, role: 'Bartender', tips: b.remaining, type: 'total' });
+  // });
 
   // Busser tipout
   data.busserResults.forEach(b => {
