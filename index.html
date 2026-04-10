@@ -922,6 +922,28 @@ function updateTotal(id) {
   }
 }
 
+function updateTakeHome() {
+  const s = getSettings();
+  const servers = employees.filter(e => e.role === 'Server');
+  const hasBussers = employees.filter(e => e.role === 'Busser').some(e => e.name);
+  const hasBartenders = employees.filter(e => e.role === 'Bartender').some(e => e.name);
+  const hasRunners = employees.filter(e => e.role === 'Runner').some(e => e.name);
+
+  servers.forEach(srv => {
+    const el = document.getElementById('takehome-' + srv.id);
+    if (!el) return;
+    const totalTips = srv.svcChg + srv.cash;
+    if (!totalTips) { el.value = ''; return; }
+    const runnerTipout = hasRunners ? Math.floor(totalTips / 100) * s.runnerPer100 : 0;
+    const adjustedTotal = totalTips - runnerTipout;
+    const twentyPctTipout = (hasBartenders || hasBussers) ? Math.floor(adjustedTotal * s.tipoutPct * 100) / 100 : 0;
+    const barTipout = hasBartenders ? Math.floor(twentyPctTipout * s.barShare * 100) / 100 : 0;
+    const busserTipout = hasBussers ? Math.floor(twentyPctTipout * s.busserShare * 100) / 100 : 0;
+    const remaining = Math.floor((totalTips - runnerTipout - barTipout - busserTipout) * 100) / 100;
+    el.value = '$' + remaining.toFixed(2);
+  });
+}
+
 function renderEmployees() {
   ['Server', 'Bartender', 'Busser', 'Runner'].forEach(role => {
     const list = document.getElementById('employeeList-' + role);
@@ -955,13 +977,19 @@ function renderEmployees() {
           <div class="emp-field">
             <label>Tips</label>
             <input type="text" inputmode="numeric" pattern="[0-9]*" value="${e.svcChg || ''}" placeholder="0.00"
-              ${!e.name ? 'disabled' : ''} onchange="updateEmployee(${e.id}, 'svcChg', this.value); updateTotal(${e.id})">
+              ${!e.name ? 'disabled' : ''} onchange="updateEmployee(${e.id}, 'svcChg', this.value); updateTakeHome()">
+          </div>
+          <div class="emp-field">
+            <label>Take Home</label>
+            <input type="text" id="takehome-${e.id}" value="" readonly
+              style="color:var(--green); background:var(--surface); border-color:transparent; cursor:default;">
           </div>` : ''}
           
         </div>
       </div>`;
     }).join('');
   });
+  setTimeout(updateTakeHome, 0);
 }
 
 function getSettings() {
