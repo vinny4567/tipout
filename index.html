@@ -588,12 +588,46 @@
 <div class="tabs">
   <div class="tab active" onclick="switchTab('input')">Employees</div>
   <div class="tab" onclick="switchTab('party')">Private Party</div>
+  <div class="tab" onclick="switchTab('direct')">Direct Tips</div>
   <div class="tab" onclick="switchTab('settings')">Settings</div>
   <div class="tab" onclick="switchTab('report')">Report</div>
   <div class="tab" onclick="switchTab('log')">Log</div>
 </div>
 
 <div class="container">
+
+  <!-- DIRECT TIPS PANEL -->
+  <div class="panel" id="panel-direct">
+    <div class="card">
+      <div class="card-title">Add Direct Tip</div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div>
+          <label style="font-size:12px; color:var(--text-dim); display:block; margin-bottom:4px;">Search Employee</label>
+          <input type="text" id="directSearch" class="setting-input" placeholder="Type a name..." oninput="filterDirectNames()" autocomplete="off">
+          <div id="directSearchResults" style="background:var(--surface2); border-radius:8px; margin-top:4px; max-height:200px; overflow-y:auto; display:none;"></div>
+        </div>
+        <div>
+          <label style="font-size:12px; color:var(--text-dim); display:block; margin-bottom:4px;">Selected</label>
+          <div id="directSelected" style="padding:8px 12px; background:var(--surface2); border-radius:8px; color:var(--text-dim); font-size:14px;">None selected</div>
+        </div>
+        <div>
+          <label style="font-size:12px; color:var(--text-dim); display:block; margin-bottom:4px;">Tip Amount</label>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="directAmount" class="setting-input" placeholder="0.00">
+        </div>
+        <button class="btn btn-primary" onclick="addDirectTip()">Add Tip</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Pending Direct Tips</div>
+      <div id="directList"></div>
+    </div>
+
+    <button id="directSyncBtn" class="btn btn-primary" onclick="syncDirectTipsToGoogleSheets()" style="width:100%; background:#1a73e8; margin-top:10px;">
+      <span id="directSyncBtnText">Save Direct Tips to Google Sheets</span>
+    </button>
+    <div id="directSyncStatus" style="margin-top:8px; font-size:12px; color:var(--muted); text-align:center;"></div>
+  </div>
 
   <!-- SETTINGS PANEL -->
   <div class="panel" id="panel-settings">
@@ -1328,7 +1362,7 @@ function generateReport() {
 
 function switchTab(tab) {
   document.querySelectorAll('.tab').forEach((t, i) => {
-    const names = ['input', 'party', 'settings', 'report', 'log'];
+    const names = ['input', 'party', 'direct', 'settings', 'report', 'log'];
     t.classList.toggle('active', names[i] === tab);
   });
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -1337,6 +1371,7 @@ function switchTab(tab) {
     panel.classList.add('active');
     if (tab === 'report') generateReport();
     if (tab === 'log') renderLog();
+    if (tab === 'direct') renderDirectTips();
   }
 }
 
@@ -1523,7 +1558,7 @@ function clearParty() {
       var perBusser = bussers.length > 0 ? Math.floor((busserPool / bussers.length) * 100) / 100 : 0;
       var entries = [];
       servers.forEach(function(sv) { entries.push({ name: sv.name, role: 'Server', tips: perServer, type: 'remaining' }); });
-      // bartenders.forEach(function(b) { entries.push({ name: b.name, role: 'Bartender', tips: perBartender, type: 'total' }); });
+      bartenders.forEach(function(b) { entries.push({ name: b.name, role: 'Bartender', tips: perBartender, type: 'total' }); });
       bussers.forEach(function(b) {
         entries.push({ name: b.name, role: 'Busser', tips: perBusser, type: 'tipout' });
       });
@@ -1773,9 +1808,9 @@ function buildSyncPayload() {
   });
 
   // Bartender total tips
-  // data.bartenderResults.forEach(b => {
-  //   if (b.name) entries.push({ name: b.name, role: 'Bartender', tips: b.remaining, type: 'total' });
-  // });
+  data.bartenderResults.forEach(b => {
+    if (b.name) entries.push({ name: b.name, role: 'Bartender', tips: b.remaining, type: 'total' });
+  });
 
   // Busser tipout
   data.busserResults.forEach(b => {
@@ -2024,6 +2059,130 @@ document.addEventListener('focus', function(e) {
     setTimeout(function() { openDialpad(el); }, 50);
   }
 }, true);
+
+// --- Direct Tips ---
+var directTips = JSON.parse(localStorage.getItem('directTips') || '[]');
+var directSelectedName = null;
+var directSelectedRole = null;
+
+function getAllRosterWithRoles() {
+  var all = [];
+  ['Server', 'Bartender', 'Busser', 'Runner'].forEach(function(role) {
+    (roster[role] || []).forEach(function(name) { all.push({ name: name, role: role }); });
+  });
+  return all;
+}
+
+function filterDirectNames() {
+  var q = document.getElementById('directSearch').value.trim().toLowerCase();
+  var resultsEl = document.getElementById('directSearchResults');
+  if (!q) { resultsEl.style.display = 'none'; return; }
+  var all = getAllRosterWithRoles();
+  var matches = all.filter(function(p) { return p.name.toLowerCase().indexOf(q) >= 0; }).slice(0, 10);
+  if (matches.length === 0) { resultsEl.style.display = 'none'; return; }
+  var html = '';
+  matches.forEach(function(p) {
+    html += '<div onclick="selectDirectName(\'' + p.name.replace(/'/g, "\\'") + '\',\'' + p.role + '\')" style="padding:8px 12px; cursor:pointer; border-bottom:1px solid var(--border); color:var(--text); font-size:14px;"><span>' + p.name + '</span><span style="float:right; font-size:11px; color:var(--text-muted);">' + p.role + '</span></div>';
+  });
+  resultsEl.innerHTML = html;
+  resultsEl.style.display = 'block';
+}
+
+function selectDirectName(name, role) {
+  directSelectedName = name;
+  directSelectedRole = role;
+  document.getElementById('directSelected').innerHTML = '<span style="color:var(--text); font-weight:600;">' + name + '</span> <span style="color:var(--text-muted); font-size:12px;">(' + role + ')</span>';
+  document.getElementById('directSearch').value = '';
+  document.getElementById('directSearchResults').style.display = 'none';
+}
+
+function addDirectTip() {
+  if (!directSelectedName) { alert('Please select an employee.'); return; }
+  var amt = parseFloat(document.getElementById('directAmount').value) || 0;
+  if (amt <= 0) { alert('Enter a tip amount.'); return; }
+  directTips.push({ name: directSelectedName, role: directSelectedRole, tips: amt });
+  localStorage.setItem('directTips', JSON.stringify(directTips));
+  document.getElementById('directAmount').value = '';
+  directSelectedName = null;
+  directSelectedRole = null;
+  document.getElementById('directSelected').textContent = 'None selected';
+  renderDirectTips();
+}
+
+function removeDirectTip(i) {
+  directTips.splice(i, 1);
+  localStorage.setItem('directTips', JSON.stringify(directTips));
+  renderDirectTips();
+}
+
+function renderDirectTips() {
+  var el = document.getElementById('directList');
+  if (!el) return;
+  if (directTips.length === 0) {
+    el.innerHTML = '<div style="color:var(--text-muted); font-size:13px; text-align:center; padding:12px 0;">No pending direct tips.</div>';
+    return;
+  }
+  var html = '';
+  directTips.forEach(function(t, i) {
+    html += '<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px solid var(--border);">';
+    html += '<div><div style="color:var(--text); font-size:14px; font-weight:600;">' + t.name + '</div><div style="color:var(--text-muted); font-size:11px;">' + t.role + '</div></div>';
+    html += '<div style="display:flex; align-items:center; gap:10px;"><span style="color:var(--green); font-weight:600;">$' + t.tips.toFixed(2) + '</span>';
+    html += '<button class="emp-remove" onclick="removeDirectTip(' + i + ')">&times;</button></div>';
+    html += '</div>';
+  });
+  el.innerHTML = html;
+}
+
+function syncDirectTipsToGoogleSheets() {
+  var btnText = document.getElementById('directSyncBtnText');
+  if (btnText.textContent !== 'Are you sure?') {
+    btnText.textContent = 'Are you sure?';
+    setTimeout(function() { btnText.textContent = 'Save Direct Tips to Google Sheets'; }, 3000);
+    return;
+  }
+  btnText.textContent = 'Save Direct Tips to Google Sheets';
+  if (directTips.length === 0) { alert('No direct tips to sync.'); return; }
+  var url = (document.getElementById('googleScriptUrl').value || '').trim();
+  if (!url) { alert('Please add your Google Script URL in Settings first.'); return; }
+
+  var s = getSettings();
+  var d = s.date ? new Date(s.date + 'T12:00:00') : new Date();
+  var dateStr = (d.getMonth()+1).toString().padStart(2,'0') + '-' + d.getDate().toString().padStart(2,'0') + '-' + d.getFullYear();
+
+  var entries = directTips.map(function(t) {
+    var type = t.role === 'Server' ? 'remaining' : (t.role === 'Bartender' ? 'total' : 'tipout');
+    return { name: t.name, role: t.role, tips: t.tips, type: type };
+  });
+
+  var payload = { date: dateStr, manager: document.getElementById('managerName').value || 'Manager', entries: entries };
+
+  var btn = document.getElementById('directSyncBtn');
+  btn.disabled = true;
+  btnText.textContent = 'Syncing...';
+  var statusEl = document.getElementById('directSyncStatus');
+
+  sendToGoogle(url, payload, function(ok) {
+    if (ok) {
+      statusEl.textContent = 'Direct tips synced for ' + dateStr;
+      statusEl.style.color = '#00e676';
+      btnText.textContent = 'Synced!';
+      directTips = [];
+      localStorage.setItem('directTips', JSON.stringify(directTips));
+      renderDirectTips();
+      setTimeout(function() { btnText.textContent = 'Save Direct Tips to Google Sheets'; btn.disabled = false; }, 2000);
+    } else {
+      addToSyncQueue(payload, function() {
+        statusEl.textContent = 'Offline – saved locally. Will sync when connected.';
+        statusEl.style.color = '#ffa726';
+        btnText.textContent = 'Saved offline';
+        directTips = [];
+        localStorage.setItem('directTips', JSON.stringify(directTips));
+        renderDirectTips();
+        setTimeout(function() { btnText.textContent = 'Save Direct Tips to Google Sheets'; btn.disabled = false; }, 2000);
+      });
+    }
+  });
+}
 
 // --- Tip-Out Log ---
 function saveToLog() {
