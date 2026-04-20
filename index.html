@@ -1359,6 +1359,53 @@ function generateReport() {
     <div class="grand-row"><span class="label">Runner Pool</span><span class="value">$${fmt(data.runnerPool)}</span></div>
   </div>`;
 
+  // ===== PRIVATE PARTY SECTION =====
+  var partyTipVal = parseFloat((document.getElementById('partyTip')||{}).value) || 0;
+  if (partyTipVal > 0 && partyEmps.some(function(e){return e.name;})) {
+    var partyEntries = getPartyEntries();
+    html += `<div class="report-section" style="margin-top:30px;">
+      <div class="report-jobcode">Private Party — $${fmt(partyTipVal)} Total Tip</div>`;
+    partyEntries.forEach(function(e) {
+      html += `<div class="dist-row"><div><span class="name">${e.name}</span><span class="hours" style="margin-left:8px;">${e.role}</span></div><div class="amount">$${fmt(e.tips)}</div></div>`;
+    });
+    html += `</div>`;
+  }
+
+  // ===== DIRECT TIPS SECTION =====
+  if ((directTips || []).length > 0) {
+    html += `<div class="report-section" style="margin-top:30px;">
+      <div class="report-jobcode">Direct Tips</div>`;
+    directTips.forEach(function(t) {
+      html += `<div class="dist-row"><div><span class="name">${t.name}</span><span class="hours" style="margin-left:8px;">${t.role}</span></div><div class="amount">$${fmt(t.tips)}</div></div>`;
+    });
+    html += `</div>`;
+  }
+
+  // ===== COMBINED PAY-OUT SECTION =====
+  var allEntries = [];
+  data.serverResults.forEach(function(sv){ if (sv.name) allEntries.push({name:sv.name, role:'Server', tips:sv.remaining}); });
+  data.bartenderResults.forEach(function(b){ if (b.name) allEntries.push({name:b.name, role:'Bartender', tips:b.remaining}); });
+  data.busserResults.forEach(function(b){ if (b.name) allEntries.push({name:b.name, role:'Busser', tips:b.tipReceived}); });
+  data.runnerResults.forEach(function(r){ if (r.name) allEntries.push({name:r.name, role:'Runner', tips:r.tipReceived}); });
+  getPartyEntries().forEach(function(e){ allEntries.push({name:e.name, role:e.role, tips:e.tips}); });
+  (directTips || []).forEach(function(t){ allEntries.push({name:t.name, role:t.role, tips:t.tips}); });
+
+  var totals = {};
+  allEntries.forEach(function(e) {
+    var k = e.name + '|' + e.role;
+    if (totals[k]) { totals[k].tips = Math.round((totals[k].tips + e.tips) * 100) / 100; }
+    else { totals[k] = {name: e.name, role: e.role, tips: e.tips}; }
+  });
+  var totalsList = Object.values(totals).sort(function(a,b){ return a.name.localeCompare(b.name); });
+  if (totalsList.length > 0) {
+    html += `<div class="report-section" style="margin-top:30px;">
+      <div class="report-jobcode">Combined Total Per Employee (Will Sync)</div>`;
+    totalsList.forEach(function(t){
+      html += `<div class="dist-row"><div><span class="name">${t.name}</span><span class="hours" style="margin-left:8px;">${t.role}</span></div><div class="amount">$${fmt(t.tips)}</div></div>`;
+    });
+    html += `</div>`;
+  }
+
   document.getElementById('reportContent').innerHTML = html;
 }
 
@@ -1796,6 +1843,48 @@ function s2ab(s) {
 // Google Sheets Sync
 // ââââââââââââââââââââââââââââââââââââââââââââ
 
+function typeForRole(role) {
+  if (role === 'Server') return 'remaining';
+  if (role === 'Bartender') return 'total';
+  return 'tipout';
+}
+
+function getPartyEntries() {
+  var entries = [];
+  var partyTipEl = document.getElementById('partyTip');
+  if (!partyTipEl) return entries;
+  var totalTip = parseFloat(partyTipEl.value) || 0;
+  if (totalTip <= 0) return entries;
+  var servers = partyEmps.filter(function(e) { return e.role === 'Server' && e.name; });
+  var bartenders = partyEmps.filter(function(e) { return e.role === 'Bartender' && e.name; });
+  var bussers = partyEmps.filter(function(e) { return e.role === 'Busser' && e.name; });
+  var partyHasBussers = bussers.length > 0;
+  var partyHasBartenders = bartenders.length > 0;
+  var busserPool = partyHasBussers ? Math.floor(totalTip * 0.20 * 100) / 100 : 0;
+  var barPool = partyHasBartenders ? Math.floor(totalTip * 0.10 * 100) / 100 : 0;
+  var serverKeep = Math.floor((totalTip - busserPool - barPool) * 100) / 100;
+  var perServer = servers.length > 0 ? Math.floor((serverKeep / servers.length) * 100) / 100 : 0;
+  var perBartender = bartenders.length > 0 ? Math.floor((barPool / bartenders.length) * 100) / 100 : 0;
+  var perBusser = bussers.length > 0 ? Math.floor((busserPool / bussers.length) * 100) / 100 : 0;
+  servers.forEach(function(sv) { entries.push({ name: sv.name, role: 'Server', tips: perServer, type: 'remaining' }); });
+  bartenders.forEach(function(b) { entries.push({ name: b.name, role: 'Bartender', tips: perBartender, type: 'total' }); });
+  bussers.forEach(function(b) { entries.push({ name: b.name, role: 'Busser', tips: perBusser, type: 'tipout' }); });
+  return entries;
+}
+
+function mergeEntries(entries) {
+  var merged = {};
+  entries.forEach(function(e) {
+    var key = e.name + '|' + e.role;
+    if (merged[key]) {
+      merged[key].tips = Math.round((merged[key].tips + e.tips) * 100) / 100;
+    } else {
+      merged[key] = { name: e.name, role: e.role, tips: e.tips, type: e.type };
+    }
+  });
+  return Object.values(merged);
+}
+
 function buildSyncPayload() {
   const data = calculate();
   const s = data.settings;
@@ -1804,30 +1893,32 @@ function buildSyncPayload() {
 
   const entries = [];
 
-  // Server remaining tips
+  // Regular employees
   data.serverResults.forEach(sv => {
     if (sv.name) entries.push({ name: sv.name, role: 'Server', tips: sv.remaining, type: 'remaining' });
   });
-
-  // Bartender total tips
   data.bartenderResults.forEach(b => {
     if (b.name) entries.push({ name: b.name, role: 'Bartender', tips: b.remaining, type: 'total' });
   });
-
-  // Busser tipout
   data.busserResults.forEach(b => {
     if (b.name) entries.push({ name: b.name, role: 'Busser', tips: b.tipReceived, type: 'tipout' });
   });
-
-  // Runner tipout
   data.runnerResults.forEach(r => {
     if (r.name) entries.push({ name: r.name, role: 'Runner', tips: r.tipReceived, type: 'tipout' });
+  });
+
+  // Private party
+  getPartyEntries().forEach(function(e) { entries.push(e); });
+
+  // Direct tips
+  (directTips || []).forEach(function(t) {
+    entries.push({ name: t.name, role: t.role, tips: t.tips, type: typeForRole(t.role) });
   });
 
   return {
     date: dateStr,
     manager: document.getElementById('managerName').value || 'Manager',
-    entries: entries
+    entries: mergeEntries(entries)
   };
 }
 
@@ -1901,7 +1992,11 @@ function syncToGoogleSheets() {
     return;
   }
 
-  const hasData = employees.some(e => e.name && (e.svcChg > 0 || e.cash > 0 || e.hours > 0));
+  const hasEmpData = employees.some(e => e.name && (e.svcChg > 0 || e.cash > 0 || e.hours > 0));
+  const partyTipVal = parseFloat((document.getElementById('partyTip')||{}).value) || 0;
+  const hasPartyData = partyTipVal > 0 && partyEmps.some(function(e) { return e.name; });
+  const hasDirectData = (directTips || []).length > 0;
+  const hasData = hasEmpData || hasPartyData || hasDirectData;
   if (!hasData) {
     // Try to flush the queue if there's pending data
     flushSyncQueue(url);
