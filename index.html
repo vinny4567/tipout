@@ -1294,17 +1294,6 @@ function generateReport() {
     </tr></table></div>`;
   }
 
-  // Grand total
-  const allTips = employees.reduce((s, e) => s + e.svcChg + e.cash, 0);
-  html += `<div class="grand-total-card">
-    <div class="grand-total-title">Summary</div>
-    <div class="grand-row"><span class="label">Total Tips In</span><span class="value green">$${fmt(allTips)}</span></div>
-    <div class="grand-row"><span class="label">Server Remaining</span><span class="value">$${fmt(data.serverResults.reduce((s,r) => s + r.remaining, 0))}</span></div>
-    <div class="grand-row"><span class="label">Busser Pool</span><span class="value">$${fmt(data.busserPool)}</span></div>
-    <div class="grand-row"><span class="label">Bar Pool</span><span class="value">$${fmt(data.barPool)}</span></div>
-    <div class="grand-row"><span class="label">Runner Pool</span><span class="value">$${fmt(data.runnerPool)}</span></div>
-  </div>`;
-
   // ===== PRIVATE PARTY SECTION =====
   var partyTipVal = parseFloat((document.getElementById('partyTip')||{}).value) || 0;
   if (partyTipVal > 0 && partyEmps.some(function(e){return e.name;})) {
