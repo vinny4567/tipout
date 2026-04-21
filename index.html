@@ -790,6 +790,9 @@
       <button class="btn" id="syncBtn" style="background:#4285f4; color:#fff; font-weight:600; padding:8px 16px; border:none; border-radius:8px; cursor:pointer;" onclick="syncToGoogleSheets()">
         <span id="syncBtnText">Save to Google Sheets</span>
       </button>
+      <button class="btn" id="clearAllBtn" style="margin-left:auto; background:var(--red-light); color:var(--red); font-weight:700; padding:8px 16px; border:1px solid var(--red); border-radius:8px; cursor:pointer;" onclick="clearEverything()">
+        <span id="clearAllBtnText">Clear All</span>
+      </button>
     </div>
     <div id="syncStatus" style="margin-bottom:8px; font-size:12px; color:var(--muted);"></div>
     <div id="reportContent"></div>
@@ -1368,6 +1371,43 @@ function clearAll() {
   for (let i = 0; i < 1; i++) employees.push({ id: nextId++, name: '', role: 'Runner', hours: 0, svcChg: 0, cash: 0 });
   for (let i = 0; i < 5; i++) employees.push({ id: nextId++, name: '', role: 'Busser', hours: 0, svcChg: 0, cash: 0 });
   renderEmployees();
+}
+
+function clearEverything() {
+  var btnText = document.getElementById('clearAllBtnText');
+  if (btnText.textContent !== 'Are you sure?') {
+    btnText.textContent = 'Are you sure?';
+    setTimeout(function() { btnText.textContent = 'Clear All'; }, 3000);
+    return;
+  }
+  btnText.textContent = 'Clear All';
+
+  // Clear regular employees
+  clearAll();
+
+  // Clear private party
+  partyEmps = [];
+  partyNextId = 1;
+  for (var i = 0; i < 3; i++) partyEmps.push({ id: partyNextId++, name: '', role: 'Server', hours: 0 });
+  for (var i = 0; i < 2; i++) partyEmps.push({ id: partyNextId++, name: '', role: 'Bartender', hours: 0 });
+  for (var i = 0; i < 2; i++) partyEmps.push({ id: partyNextId++, name: '', role: 'Busser', hours: 0 });
+  var partyTipEl = document.getElementById('partyTip');
+  if (partyTipEl) partyTipEl.value = '';
+  var partyResultsEl = document.getElementById('partyResults');
+  if (partyResultsEl) partyResultsEl.innerHTML = '';
+  if (typeof renderPartyEmployees === 'function') renderPartyEmployees();
+
+  // Clear direct tips
+  directTips = [];
+  localStorage.setItem('directTips', JSON.stringify(directTips));
+  if (typeof renderDirectTips === 'function') renderDirectTips();
+
+  // Regenerate report
+  generateReport();
+
+  // Clear sync status
+  var statusEl = document.getElementById('syncStatus');
+  if (statusEl) statusEl.textContent = '';
 }
 
 // ===== PRIVATE PARTY =====
