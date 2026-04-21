@@ -1294,50 +1294,6 @@ function generateReport() {
     </tr></table></div>`;
   }
 
-  // ===== TIPOUT DISTRIBUTION =====
-  html += `<div class="dist-section"><div class="dist-title">Tipout Distribution</div>`;
-
-  if (data.busserResults.length > 0) {
-    html += `<div class="dist-card">
-      <div class="dist-card-title">Busser Pool</div>
-      <div class="dist-pool">Total: <strong>$${fmt(data.busserPool)}</strong> &middot; distributed by hours</div>`;
-    data.busserResults.forEach(b => {
-      html += `<div class="dist-row">
-        <div><span class="name">${b.name || 'Unnamed'}</span><span class="hours">${fmt(b.hours)} hrs</span></div>
-        <div class="amount">$${fmt(b.tipReceived)}</div>
-      </div>`;
-    });
-    html += `</div>`;
-  }
-
-  if (data.bartenderResults.length > 0) {
-    html += `<div class="dist-card">
-      <div class="dist-card-title">Bar Pool</div>
-      <div class="dist-pool">Total: <strong>$${fmt(data.barPool)}</strong> &middot; distributed by hours</div>`;
-    data.bartenderResults.forEach(b => {
-      html += `<div class="dist-row">
-        <div><span class="name">${b.name || 'Unnamed'}</span><span class="hours">${fmt(b.hours)} hrs</span></div>
-        <div class="amount">$${fmt(b.tipReceived)}</div>
-      </div>`;
-    });
-    html += `</div>`;
-  }
-
-  if (data.runnerResults.length > 0) {
-    html += `<div class="dist-card">
-      <div class="dist-card-title">Runner Pool</div>
-      <div class="dist-pool">Total: <strong>$${fmt(data.runnerPool)}</strong> &middot; distributed by hours</div>`;
-    data.runnerResults.forEach(r => {
-      html += `<div class="dist-row">
-        <div><span class="name">${r.name || 'Unnamed'}</span><span class="hours">${fmt(r.hours)} hrs</span></div>
-        <div class="amount">$${fmt(r.tipReceived)}</div>
-      </div>`;
-    });
-    html += `</div>`;
-  }
-
-  html += `</div>`;
-
   // Grand total
   const allTips = employees.reduce((s, e) => s + e.svcChg + e.cash, 0);
   html += `<div class="grand-total-card">
