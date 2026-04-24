@@ -1019,14 +1019,27 @@ function renderEmployees() {
     const list = document.getElementById('employeeList-' + role);
     if (!list) return;
     const roleEmps = employees.filter(e => e.role === role);
-    const takenNames = employees.map(e => e.name).filter(n => n);
+    // Build set of (name + role) keys already taken to allow same name in different roles
+    const takenInRole = employees.filter(x => x.name && x.role === role).map(x => x.name);
     list.innerHTML = roleEmps.map(e => {
-      const names = (roster[role] || []).slice().sort((a, b) => a.localeCompare(b));
-      const nameOptions = names
-        .map(n => {
-          const taken = n !== e.name && takenNames.includes(n);
-          return `<option value="${n}" ${e.name === n ? 'selected' : ''} ${taken ? 'disabled style="color:#5c6070;"' : ''}>${n}${taken ? ' (on shift)' : ''}</option>`;
-        }).join('');
+      // Show primary-role names first, then all other employees (so same person can be in multiple roles)
+      const primary = (roster[role] || []).slice();
+      const others = [];
+      ['Server', 'Bartender', 'Busser', 'Runner'].forEach(r => {
+        if (r === role) return;
+        (roster[r] || []).forEach(n => { if (!primary.includes(n) && !others.includes(n)) others.push(n); });
+      });
+      primary.sort((a, b) => a.localeCompare(b));
+      others.sort((a, b) => a.localeCompare(b));
+      const primaryOpts = primary.map(n => {
+        const taken = n !== e.name && takenInRole.includes(n);
+        return `<option value="${n}" ${e.name === n ? 'selected' : ''} ${taken ? 'disabled style="color:#5c6070;"' : ''}>${n}${taken ? ' (on shift)' : ''}</option>`;
+      }).join('');
+      const otherOpts = others.map(n => {
+        const taken = n !== e.name && takenInRole.includes(n);
+        return `<option value="${n}" ${e.name === n ? 'selected' : ''} ${taken ? 'disabled style="color:#5c6070;"' : ''}>${n}${taken ? ' (on shift)' : ''}</option>`;
+      }).join('');
+      const nameOptions = primaryOpts + (otherOpts ? `<option disabled>── Other ──</option>` + otherOpts : '');
       return `
       <div class="employee-entry">
         <div class="emp-row-top">
