@@ -2273,13 +2273,16 @@ function syncDirectTipsToGoogleSheets() {
 function saveToLog() {
   var data = calculate();
   var s = data.settings;
-  var hasData = employees.some(function(e) { return e.name && (e.svcChg > 0 || e.cash > 0 || e.hours > 0); });
-  if (!hasData) { alert('No data to save.'); return; }
+  var hasEmpData = employees.some(function(e) { return e.name && (e.svcChg > 0 || e.cash > 0 || e.hours > 0); });
+  var partyTipVal = parseFloat((document.getElementById('partyTip')||{}).value) || 0;
+  var hasPartyData = partyTipVal > 0 && partyEmps.some(function(e) { return e.name; });
+  var hasDirectData = (directTips || []).length > 0;
+  if (!hasEmpData && !hasPartyData && !hasDirectData) { alert('No data to save.'); return; }
 
   var d = s.date ? new Date(s.date + 'T12:00:00') : new Date();
   var dateStr = (d.getMonth()+1).toString().padStart(2,'0') + '/' + d.getDate().toString().padStart(2,'0') + '/' + d.getFullYear();
 
-  var entry = { date: dateStr, savedAt: new Date().toISOString(), servers: [], bartenders: [], bussers: [], runners: [], pools: {} };
+  var entry = { date: dateStr, savedAt: new Date().toISOString(), servers: [], bartenders: [], bussers: [], runners: [], pools: {}, party: [], partyTotal: 0, direct: [] };
 
   data.serverResults.forEach(function(sv) {
     if (sv.name) entry.servers.push({ name: sv.name, tips: sv.svcChg + sv.cash, remaining: sv.remaining });
@@ -2294,6 +2297,19 @@ function saveToLog() {
     if (r.name) entry.runners.push({ name: r.name, tipReceived: r.tipReceived });
   });
   entry.pools = { runner: data.runnerPool, bar: data.barPool, busser: data.busserPool };
+
+  // Private party
+  if (hasPartyData) {
+    entry.partyTotal = partyTipVal;
+    getPartyEntries().forEach(function(e) {
+      entry.party.push({ name: e.name, role: e.role, tips: e.tips });
+    });
+  }
+
+  // Direct tips
+  (directTips || []).forEach(function(t) {
+    entry.direct.push({ name: t.name, role: t.role, tips: t.tips });
+  });
 
   var log = JSON.parse(localStorage.getItem('tipoutLog') || '[]');
   log.unshift(entry);
@@ -2346,6 +2362,20 @@ function renderLog() {
       html += '<div class="log-role-title">Runners</div>';
       entry.runners.forEach(function(r) {
         html += '<div class="log-row"><span class="log-row-name">' + r.name + '</span><span class="log-row-amount">$' + r.tipReceived.toFixed(2) + '</span></div>';
+      });
+    }
+
+    if (entry.party && entry.party.length > 0) {
+      html += '<div class="log-role-title">Private Party (Total $' + (entry.partyTotal||0).toFixed(2) + ')</div>';
+      entry.party.forEach(function(p) {
+        html += '<div class="log-row"><span class="log-row-name">' + p.name + ' <span style="color:var(--text-muted);">' + p.role + '</span></span><span class="log-row-amount">$' + p.tips.toFixed(2) + '</span></div>';
+      });
+    }
+
+    if (entry.direct && entry.direct.length > 0) {
+      html += '<div class="log-role-title">Direct Tips</div>';
+      entry.direct.forEach(function(t) {
+        html += '<div class="log-row"><span class="log-row-name">' + t.name + ' <span style="color:var(--text-muted);">' + t.role + '</span></span><span class="log-row-amount">$' + t.tips.toFixed(2) + '</span></div>';
       });
     }
 
