@@ -34,7 +34,7 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   html, body {
-    overscroll-behavior-y: contain;
+    overscroll-behavior: none;
   }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -749,7 +749,7 @@
           <div style="position:relative;">
             <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;font-weight:600;color:var(--text-dim);">$</span>
             <input type="text" inputmode="numeric" pattern="[0-9]*" class="setting-input" id="partyTip" placeholder="0.00" style="padding-left:28px;"
-              onchange="calculateParty()">
+              oninput="persistParty()" onchange="calculateParty(); persistParty()">
           </div>
         </div>
       </div>
@@ -872,17 +872,38 @@ try {
 } catch(e) {}
 Object.keys(roster).forEach(r => roster[r].sort(sortByFirst));
 
+function persistEmployees() {
+  try {
+    localStorage.setItem('employees', JSON.stringify(employees));
+    localStorage.setItem('nextId', String(nextId));
+  } catch(e) {}
+}
+
 function init() {
   const now = new Date();
   const today = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
   document.getElementById('reportDate').value = today;
   updateDateDisplay();
 
-  // Default layout: 5 servers, 3 bartenders, 1 runner, 5 bussers
-  for (let i = 0; i < 5; i++) employees.push({ id: nextId++, name: '', role: 'Server', hours: 0, svcChg: 0, cash: 0 });
-  for (let i = 0; i < 3; i++) employees.push({ id: nextId++, name: '', role: 'Bartender', hours: 0, svcChg: 0, cash: 0 });
-  for (let i = 0; i < 1; i++) employees.push({ id: nextId++, name: '', role: 'Runner', hours: 0, svcChg: 0, cash: 0 });
-  for (let i = 0; i < 5; i++) employees.push({ id: nextId++, name: '', role: 'Busser', hours: 0, svcChg: 0, cash: 0 });
+  // Try to restore from localStorage
+  var restored = false;
+  try {
+    var saved = JSON.parse(localStorage.getItem('employees') || 'null');
+    var savedId = parseInt(localStorage.getItem('nextId') || '0');
+    if (Array.isArray(saved) && saved.length > 0) {
+      employees = saved;
+      nextId = savedId || (saved.length + 1);
+      restored = true;
+    }
+  } catch(e) {}
+
+  if (!restored) {
+    // Default layout: 5 servers, 3 bartenders, 1 runner, 5 bussers
+    for (let i = 0; i < 5; i++) employees.push({ id: nextId++, name: '', role: 'Server', hours: 0, svcChg: 0, cash: 0 });
+    for (let i = 0; i < 3; i++) employees.push({ id: nextId++, name: '', role: 'Bartender', hours: 0, svcChg: 0, cash: 0 });
+    for (let i = 0; i < 1; i++) employees.push({ id: nextId++, name: '', role: 'Runner', hours: 0, svcChg: 0, cash: 0 });
+    for (let i = 0; i < 5; i++) employees.push({ id: nextId++, name: '', role: 'Busser', hours: 0, svcChg: 0, cash: 0 });
+  }
 
   renderEmployees();
   renderRoster();
@@ -957,11 +978,13 @@ function removeFromRoster(role, name) {
 function addEmployee(role = 'Server') {
   employees.push({ id: nextId++, name: '', role, hours: 0, svcChg: 0, cash: 0 });
   renderEmployees();
+  persistEmployees();
 }
 
 function removeEmployee(id) {
   employees = employees.filter(e => e.id !== id);
   renderEmployees();
+  persistEmployees();
 }
 
 function updateEmployee(id, field, value) {
@@ -982,6 +1005,7 @@ function updateEmployee(id, field, value) {
     emp[field] = parseFloat(parseFloat(value || 0).toFixed(2));
   }
   updateTotal(id);
+  persistEmployees();
 }
 
 function updateTotal(id) {
@@ -1386,6 +1410,7 @@ function clearAll() {
   for (let i = 0; i < 1; i++) employees.push({ id: nextId++, name: '', role: 'Runner', hours: 0, svcChg: 0, cash: 0 });
   for (let i = 0; i < 5; i++) employees.push({ id: nextId++, name: '', role: 'Busser', hours: 0, svcChg: 0, cash: 0 });
   renderEmployees();
+  persistEmployees();
 }
 
 function clearEverything() {
@@ -1411,6 +1436,7 @@ function clearEverything() {
   var partyResultsEl = document.getElementById('partyResults');
   if (partyResultsEl) partyResultsEl.innerHTML = '';
   if (typeof renderPartyEmployees === 'function') renderPartyEmployees();
+  persistParty();
 
   // Clear direct tips
   directTips = [];
@@ -1429,21 +1455,51 @@ function clearEverything() {
 let partyEmps = [];
 let partyNextId = 1000;
 
+function persistParty() {
+  try {
+    localStorage.setItem('partyEmps', JSON.stringify(partyEmps));
+    localStorage.setItem('partyNextId', String(partyNextId));
+    var pt = document.getElementById('partyTip');
+    localStorage.setItem('partyTip', pt ? (pt.value || '') : '');
+  } catch(e) {}
+}
+
 function initParty() {
-  for (let i = 0; i < 5; i++) partyEmps.push({ id: partyNextId++, name: '', role: 'Server', hours: 0 });
-  for (let i = 0; i < 1; i++) partyEmps.push({ id: partyNextId++, name: '', role: 'Bartender', hours: 0 });
-  for (let i = 0; i < 3; i++) partyEmps.push({ id: partyNextId++, name: '', role: 'Busser', hours: 0 });
+  // Restore from localStorage if available
+  var restored = false;
+  try {
+    var saved = JSON.parse(localStorage.getItem('partyEmps') || 'null');
+    var savedId = parseInt(localStorage.getItem('partyNextId') || '0');
+    if (Array.isArray(saved) && saved.length > 0) {
+      partyEmps = saved;
+      partyNextId = savedId || (saved.length + 1);
+      restored = true;
+    }
+    var savedTip = localStorage.getItem('partyTip');
+    if (savedTip) {
+      var pt = document.getElementById('partyTip');
+      if (pt) pt.value = savedTip;
+    }
+  } catch(e) {}
+
+  if (!restored) {
+    for (let i = 0; i < 5; i++) partyEmps.push({ id: partyNextId++, name: '', role: 'Server', hours: 0 });
+    for (let i = 0; i < 1; i++) partyEmps.push({ id: partyNextId++, name: '', role: 'Bartender', hours: 0 });
+    for (let i = 0; i < 3; i++) partyEmps.push({ id: partyNextId++, name: '', role: 'Busser', hours: 0 });
+  }
   renderPartyEmployees();
 }
 
 function addPartyEmployee(role) {
   partyEmps.push({ id: partyNextId++, name: '', role, hours: 0 });
   renderPartyEmployees();
+  persistParty();
 }
 
 function removePartyEmployee(id) {
   partyEmps = partyEmps.filter(e => e.id !== id);
   renderPartyEmployees();
+  persistParty();
 }
 
 function updatePartyEmployee(id, field, value) {
@@ -1456,6 +1512,7 @@ function updatePartyEmployee(id, field, value) {
   } else {
     emp[field] = parseFloat(parseFloat(value || 0).toFixed(2));
   }
+  persistParty();
 }
 
 function renderPartyEmployees() {
