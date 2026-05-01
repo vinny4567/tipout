@@ -2405,6 +2405,22 @@ function clearLog() {
   renderLog();
 }
 
+// Block iOS Safari pull-to-refresh by preventing overscroll at the top
+(function() {
+  var startY = 0;
+  document.addEventListener('touchstart', function(e) {
+    startY = e.touches[0].pageY;
+  }, { passive: true });
+  document.addEventListener('touchmove', function(e) {
+    var y = e.touches[0].pageY;
+    var scrollTop = window.scrollY || document.documentElement.scrollTop;
+    // Only block when at top of page and pulling DOWN
+    if (scrollTop <= 0 && y > startY) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+})();
+
 // Auto-update date at midnight
 (function scheduleMidnightUpdate() {
   var now = new Date();
