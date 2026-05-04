@@ -1928,11 +1928,14 @@ function getPartyEntries() {
 function mergeEntries(entries) {
   var merged = {};
   entries.forEach(function(e) {
-    var key = e.name + '|' + e.role;
+    // Normalize name: trim leading/trailing whitespace and collapse internal multiple spaces
+    var cleanName = (e.name || '').trim().replace(/\s+/g, ' ');
+    if (!cleanName) return;
+    var key = cleanName + '|' + e.role;
     if (merged[key]) {
       merged[key].tips = Math.round((merged[key].tips + e.tips) * 100) / 100;
     } else {
-      merged[key] = { name: e.name, role: e.role, tips: e.tips, type: e.type };
+      merged[key] = { name: cleanName, role: e.role, tips: e.tips, type: e.type };
     }
   });
   return Object.values(merged);
@@ -2311,7 +2314,8 @@ function addDirectTip() {
   if (!directSelectedName) { alert('Please select an employee.'); return; }
   var amt = parseFloat(document.getElementById('directAmount').value) || 0;
   if (amt <= 0) { alert('Enter a tip amount.'); return; }
-  directTips.push({ name: directSelectedName, role: directSelectedRole, tips: amt });
+  var cleanName = (directSelectedName || '').trim().replace(/\s+/g, ' ');
+  directTips.push({ name: cleanName, role: directSelectedRole, tips: amt });
   localStorage.setItem('directTips', JSON.stringify(directTips));
   document.getElementById('directAmount').value = '';
   directSelectedName = null;
@@ -2362,8 +2366,9 @@ function syncDirectTipsToGoogleSheets() {
 
   var entries = directTips.map(function(t) {
     var type = t.role === 'Server' ? 'remaining' : (t.role === 'Bartender' ? 'total' : 'tipout');
-    return { name: t.name, role: t.role, tips: t.tips, type: type };
-  });
+    var cleanName = (t.name || '').trim().replace(/\s+/g, ' ');
+    return { name: cleanName, role: t.role, tips: t.tips, type: type };
+  }).filter(function(e) { return e.name; });
 
   var payload = { date: dateStr, manager: document.getElementById('managerName').value || 'Manager', entries: entries };
 
