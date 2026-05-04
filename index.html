@@ -676,8 +676,12 @@
           <input type="text" class="setting-input" id="googleScriptUrl" placeholder="Paste your Apps Script web app URL here" oninput="saveSettings()" style="font-size:12px;">
         </div>
       </div>
-      <div style="font-size:11px; color:var(--muted); margin-top:6px;">
-        See the setup guide to connect to Google Sheets. Once set up, tips sync automatically from the Report tab.
+      <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+        <button id="testConnBtn" onclick="testGoogleConnection()" style="background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:7px 14px; font-size:13px; font-weight:700; cursor:pointer;">Test Connection</button>
+        <button onclick="clearSyncQueue()" style="background:var(--surface2); color:var(--red); border:1px solid var(--border); border-radius:6px; padding:7px 14px; font-size:13px; font-weight:700; cursor:pointer;">Clear Queued Reports</button>
+      </div>
+      <div style="font-size:11px; color:var(--text-muted); margin-top:6px;">
+        Use "Test Connection" if sync fails. "Clear Queued Reports" wipes any accumulated retries to prevent duplicate tips.
       </div>
       <div id="pendingSyncCount" style="font-size:12px; color:#ffa726; margin-top:6px;"></div>
     </div>
@@ -1679,12 +1683,14 @@ function clearParty() {
           statusEl.style.color = '#00e676';
           btnText.textContent = 'Synced!';
           setTimeout(function() { btnText.textContent = 'Save Party to Google Sheets'; btn.disabled = false; }, 2000);
-          flushSyncQueue(url);
+          flushSyncQueue(url, payload.date);
         } else {
           addToSyncQueue(payload, function() {
-            statusEl.textContent = 'Offline \u2014 saved locally. Will sync when connected.';
+            statusEl.textContent = navigator.onLine
+              ? 'Sync failed — data saved locally. Check your Apps Script URL in Settings.'
+              : 'You’re offline — data saved locally. Will sync when reconnected.';
             statusEl.style.color = '#ffa726';
-            btnText.textContent = 'Saved offline';
+            btnText.textContent = 'Saved locally';
             setTimeout(function() { btnText.textContent = 'Save Party to Google Sheets'; btn.disabled = false; }, 2000);
           });
         }
@@ -1983,12 +1989,32 @@ function openSyncDB(callback) {
 }
 
 function addToSyncQueue(payload, callback) {
+  // Deduplicate: if a queued item has the same date, replace it instead of adding
   openSyncDB(function(db) {
     if (!db) { if (callback) callback(false); return; }
-    const tx = db.transaction('queue', 'readwrite');
-    tx.objectStore('queue').add({ payload: payload, timestamp: Date.now() });
-    tx.oncomplete = function() { updatePendingCount(); if (callback) callback(true); };
-    tx.onerror = function() { if (callback) callback(false); };
+    const getAllTx = db.transaction('queue', 'readonly');
+    const req = getAllTx.objectStore('queue').getAll();
+    req.onsuccess = function() {
+      const items = req.result || [];
+      const existing = items.find(function(i) { return i.payload && i.payload.date === payload.date; });
+      const writeTx = db.transaction('queue', 'readwrite');
+      const store = writeTx.objectStore('queue');
+      if (existing) {
+        // Replace existing item for this date
+        store.put({ id: existing.id, payload: payload, timestamp: Date.now() });
+      } else {
+        store.add({ payload: payload, timestamp: Date.now() });
+      }
+      writeTx.oncomplete = function() { updatePendingCount(); if (callback) callback(true); };
+      writeTx.onerror = function() { if (callback) callback(false); };
+    };
+    req.onerror = function() {
+      // Fallback: just add
+      const tx2 = db.transaction('queue', 'readwrite');
+      tx2.objectStore('queue').add({ payload: payload, timestamp: Date.now() });
+      tx2.oncomplete = function() { updatePendingCount(); if (callback) callback(true); };
+      tx2.onerror = function() { if (callback) callback(false); };
+    };
   });
 }
 
@@ -2065,14 +2091,16 @@ function syncToGoogleSheets() {
       btnText.textContent = 'Synced!';
       setTimeout(function() { btnText.textContent = 'Save to Google Sheets'; btn.disabled = false; }, 2000);
 
-      // Also flush any pending items
-      flushSyncQueue(url);
+      // Flush queue, skipping today's date (already just sent)
+      flushSyncQueue(url, payload.date);
     } else {
       // Save to offline queue
       addToSyncQueue(payload, function() {
-        statusEl.textContent = 'Offline â saved locally. Will sync when connected.';
+        statusEl.textContent = navigator.onLine
+          ? 'Sync failed — data saved locally. Check your Apps Script URL in Settings.'
+          : 'You’re offline — data saved locally. Will sync when reconnected.';
         statusEl.style.color = '#ffa726';
-        btnText.textContent = 'Saved offline';
+        btnText.textContent = 'Saved locally';
         setTimeout(function() { btnText.textContent = 'Save to Google Sheets'; btn.disabled = false; }, 2000);
       });
     }
@@ -2084,50 +2112,89 @@ function sendToGoogle(url, payload, callback) {
   try {
     var encoded = encodeURIComponent(JSON.stringify(payload));
     var script = document.createElement('script');
-    script.src = url + '?data=' + encoded + '&callback=tipoutSyncDone&key=vtip-9f3k-x82m-p47w&t=' + Date.now();
+    var cbName = 'tipoutSyncDone';
+    script.src = url + '?data=' + encoded + '&callback=' + cbName + '&key=vtip-9f3k-x82m-p47w&t=' + Date.now();
+    var done = false;
+    var timeoutId;
 
-    window.tipoutSyncDone = function(result) {
-      delete window.tipoutSyncDone;
-      callback(true, 'sent');
+    function finish(ok, reason) {
+      if (done) return;
+      done = true;
+      clearTimeout(timeoutId);
+      delete window[cbName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+      callback(ok, reason || (ok ? 'sent' : (navigator.onLine ? 'error' : 'offline')));
+    }
+
+    window[cbName] = function(result) {
+      finish(true, 'sent');
     };
 
     script.onload = function() {
-      document.head.removeChild(script);
-      // If callback wasn't called by the script, still count as success
-      setTimeout(function() {
-        if (window.tipoutSyncDone) {
-          delete window.tipoutSyncDone;
-          callback(true, 'sent');
-        }
-      }, 2000);
+      // Script loaded — if callback not called in 2s, treat as success
+      setTimeout(function() { finish(true, 'no-callback'); }, 2000);
     };
 
     script.onerror = function() {
-      document.head.removeChild(script);
-      delete window.tipoutSyncDone;
-      callback(false, 'network error');
+      finish(false, navigator.onLine ? 'error' : 'offline');
     };
+
+    // 15-second hard timeout
+    timeoutId = setTimeout(function() {
+      finish(false, navigator.onLine ? 'timeout' : 'offline');
+    }, 15000);
 
     document.head.appendChild(script);
   } catch(err) {
     console.error('Google sync error:', err);
-    callback(false, err.message);
+    callback(false, 'error');
   }
 }
 
-function flushSyncQueue(url) {
+function testGoogleConnection() {
+  var url = (document.getElementById('googleScriptUrl').value || '').trim();
+  if (!url) { alert('Please enter your Apps Script URL first.'); return; }
+  var btn = document.getElementById('testConnBtn');
+  btn.textContent = 'Testing…';
+  btn.disabled = true;
+  var script = document.createElement('script');
+  var done = false;
+  var tId;
+  function finish(status, label, color) {
+    if (done) return; done = true;
+    clearTimeout(tId);
+    delete window.tipoutTestPing;
+    if (script.parentNode) script.parentNode.removeChild(script);
+    btn.textContent = label; btn.style.background = color; btn.disabled = false;
+    setTimeout(function() { btn.textContent = 'Test Connection'; btn.style.background = ''; }, 4000);
+  }
+  window.tipoutTestPing = function() { finish(true, '✓ Connected', '#34d399'); };
+  script.src = url + '?test=1&callback=tipoutTestPing&t=' + Date.now();
+  script.onload = function() { setTimeout(function() { finish(true, '✓ URL reachable', '#ffa726'); }, 2000); };
+  script.onerror = function() { finish(false, '✗ URL not reachable', '#f87171'); };
+  tId = setTimeout(function() { finish(false, '✗ Timed out', '#f87171'); }, 12000);
+  document.head.appendChild(script);
+}
+
+function flushSyncQueue(url, skipDate) {
+  // skipDate: omit queue items whose date matches the just-synced payload (already sent)
   getSyncQueue(function(items) {
     if (items.length === 0) return;
-
-    let sent = 0;
-    items.forEach(function(item) {
+    var toSend = skipDate ? items.filter(function(i) { return !i.payload || i.payload.date !== skipDate; }) : items;
+    if (toSend.length === 0) {
+      // All queued items were for today — just clear them since we already sent today's data
+      clearSyncQueue();
+      return;
+    }
+    var sent = 0;
+    toSend.forEach(function(item) {
       sendToGoogle(url, item.payload, function(ok) {
         sent++;
-        if (sent === items.length) {
+        if (sent === toSend.length) {
           clearSyncQueue();
           var statusEl = document.getElementById('syncStatus');
           if (statusEl) {
-            statusEl.textContent = 'Synced ' + items.length + ' queued report(s) to Google Sheets';
+            statusEl.textContent = 'Synced ' + toSend.length + ' queued report(s) to Google Sheets';
             statusEl.style.color = '#00e676';
           }
         }
@@ -2316,9 +2383,11 @@ function syncDirectTipsToGoogleSheets() {
       setTimeout(function() { btnText.textContent = 'Save Direct Tips to Google Sheets'; btn.disabled = false; }, 2000);
     } else {
       addToSyncQueue(payload, function() {
-        statusEl.textContent = 'Offline – saved locally. Will sync when connected.';
+        statusEl.textContent = navigator.onLine
+          ? 'Sync failed — data saved locally. Check your Apps Script URL in Settings.'
+          : 'You’re offline — data saved locally. Will sync when reconnected.';
         statusEl.style.color = '#ffa726';
-        btnText.textContent = 'Saved offline';
+        btnText.textContent = 'Saved locally';
         directTips = [];
         localStorage.setItem('directTips', JSON.stringify(directTips));
         renderDirectTips();
