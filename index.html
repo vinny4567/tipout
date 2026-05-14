@@ -2205,13 +2205,11 @@ function flushSyncQueue(url, skipDate) {
   });
 }
 
-// Auto-sync when coming back online
-window.addEventListener('online', function() {
-  const url = (document.getElementById('googleScriptUrl').value || '').trim();
-  if (url) {
-    flushSyncQueue(url);
-  }
-});
+// NOTE: the automatic queue-flush on the 'online' event was removed.
+// On iOS home-screen apps, 'online' fires on every launch — that caused the
+// offline queue to silently re-send data on each open, stacking duplicate
+// syncs. The queue still exists and still flushes when you manually tap
+// "Save to Google Sheets"; it just no longer fires on its own.
 
 // Register service worker for offline support
 if ('serviceWorker' in navigator) {
