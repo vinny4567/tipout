@@ -695,6 +695,14 @@
   <!-- EMPLOYEE INPUT PANEL -->
   <div class="panel active" id="panel-input">
 
+    <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <div style="font-weight:700;color:var(--text);font-size:15px">Load Today's Schedule</div>
+        <div id="loadScheduleStatus" style="font-size:12px;color:var(--text-dim);margin-top:2px">Auto-fills employees from the Schedule app</div>
+      </div>
+      <button onclick="loadTodaysSchedule()" id="loadScheduleBtn" style="padding:10px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px">📥 Load Today's Schedule</button>
+    </div>
+
     <div class="card">
       <div class="card-title">Servers</div>
       <div id="employeeList-Server"></div>
@@ -880,6 +888,81 @@ function persistEmployees() {
     localStorage.setItem('employees', JSON.stringify(employees));
     localStorage.setItem('nextId', String(nextId));
   } catch(e) {}
+}
+
+// ─── Load Today's Schedule from Restaurant Scheduler ─────────────────────────
+const SCHEDULER_ROSTER_URL = 'https://restaurant-scheduler-hh5e.onrender.com/api/roster/today';
+const SCHEDULER_API_KEY = 'tipout-roster-key-vinny-7k9m2x4p';
+
+function mapPositionToRole(pos) {
+  const p = (pos || '').toLowerCase();
+  if (p.includes('bartender') || p.includes(' bar') || p === 'bar') return 'Bartender';
+  if (p.includes('busser')) return 'Busser';
+  if (p.includes('runner')) return 'Runner';
+  if (p.includes('server') || p.includes('waitress') || p.includes('waiter')) return 'Server';
+  return null; // unmapped — skip (manager, host, cook, etc.)
+}
+
+async function loadTodaysSchedule() {
+  const btn = document.getElementById('loadScheduleBtn');
+  const status = document.getElementById('loadScheduleStatus');
+  if (!btn || !status) return;
+
+  // Confirm if there are already employees with tip/cash entered
+  const hasData = employees.some(e => e.name && (e.svcChg > 0 || e.cash > 0 || e.hours > 0));
+  if (hasData) {
+    if (!confirm("This will replace the current employee list with today's schedule. Continue?")) return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  status.textContent = 'Fetching today\'s schedule from the Scheduler…';
+  status.style.color = 'var(--text-dim)';
+
+  try {
+    const res = await fetch(SCHEDULER_ROSTER_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY), { method: 'GET' });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error('HTTP ' + res.status + ' — ' + errText.substring(0, 100));
+    }
+    const data = await res.json();
+    const roster = data.roster || [];
+
+    // Clear current employees and replace with today's roster
+    employees = [];
+    let added = 0, skipped = 0;
+    roster.forEach(person => {
+      const role = mapPositionToRole(person.position);
+      if (!role) { skipped++; return; }
+      employees.push({
+        id: nextId++,
+        name: person.fullName,
+        role,
+        hours: 0,
+        svcChg: 0,
+        cash: 0,
+      });
+      added++;
+    });
+
+    renderEmployees();
+    persistEmployees();
+
+    if (added === 0) {
+      status.textContent = '⚠️ No one scheduled today (or no roles mapped).';
+      status.style.color = '#f59e0b';
+    } else {
+      status.textContent = `✓ Loaded ${added} from schedule (${data.date})${skipped ? ` · ${skipped} non-FOH skipped` : ''}`;
+      status.style.color = 'var(--green)';
+    }
+  } catch (err) {
+    console.error('Load schedule failed:', err);
+    status.textContent = '⚠️ Couldn\'t load: ' + err.message;
+    status.style.color = '#ef4444';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📥 Load Today\'s Schedule';
+  }
 }
 
 function init() {
