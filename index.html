@@ -1039,11 +1039,50 @@ function addToRoster() {
         localStorage.setItem('removedRoster', JSON.stringify(removed));
       }
     } catch(e) {}
+    // Also tell the Google Sheet to add a row for this new employee right now,
+    // so they appear in the Tips tab immediately (not just on first sync).
+    sendEmployeeToSheet(name, role);
   }
   nameInput.value = '';
   renderEmployees();
   renderPartyEmployees();
   renderRoster();
+}
+
+// Tell the Apps Script to create a row for this employee on the Tips tab.
+// Fires when the user adds someone in the roster manager. Safe to call any
+// time — the script's addEmployeeRow function is a no-op if the name already
+// exists.
+function sendEmployeeToSheet(name, role) {
+  try {
+    var url = (document.getElementById('googleScriptUrl').value || '').trim();
+    if (!url || !name) return;
+    var cbName = 'addEmpDone_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+    var script = document.createElement('script');
+    var done = false;
+    var tId;
+    function finish() {
+      if (done) return;
+      done = true;
+      clearTimeout(tId);
+      try { delete window[cbName]; } catch(e) {}
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+    window[cbName] = function() { finish(); };
+    script.onload = function() { setTimeout(finish, 2000); };
+    script.onerror = function() { finish(); };
+    tId = setTimeout(finish, 12000);
+    script.src = url +
+      '?action=addEmployee' +
+      '&name=' + encodeURIComponent(name) +
+      '&role=' + encodeURIComponent(role || '') +
+      '&callback=' + cbName +
+      '&key=vtip-9f3k-x82m-p47w' +
+      '&t=' + Date.now();
+    document.head.appendChild(script);
+  } catch(err) {
+    console.error('sendEmployeeToSheet error:', err);
+  }
 }
 
 function renderRoster() {
