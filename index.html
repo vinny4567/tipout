@@ -963,7 +963,12 @@ async function loadTodaysSchedule() {
       status.textContent = '⚠️ No one scheduled today (or no roles mapped).';
       status.style.color = '#f59e0b';
     } else {
-      status.textContent = `✓ Loaded ${added} from schedule (${data.date})${skipped ? ` · ${skipped} non-FOH skipped` : ''}`;
+      const breakdown = ['Server','Bartender','Busser','Runner']
+        .map(r => ({ r, n: employees.filter(e => e.role === r).length }))
+        .filter(x => x.n > 0)
+        .map(x => `${x.n} ${x.r}${x.n!==1?'s':''}`)
+        .join(', ');
+      status.textContent = `✓ ${added} loaded (${data.date}): ${breakdown}${skipped ? ` · ${skipped} skipped` : ''}`;
       status.style.color = 'var(--green)';
     }
   } catch (err) {
