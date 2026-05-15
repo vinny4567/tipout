@@ -1172,12 +1172,18 @@ function renderEmployees() {
         return `<option value="${n}" ${e.name === n ? 'selected' : ''} ${taken ? 'disabled style="color:#5c6070;"' : ''}>${n}${taken ? ' (on shift)' : ''}</option>`;
       }).join('');
       const nameOptions = primaryOpts + (otherOpts ? `<option disabled>── Other ──</option>` + otherOpts : '');
+      // If a name from the loaded schedule isn't in our static roster (e.g. brand-new hires),
+      // surface it as a custom option so the dropdown still shows them — otherwise the row looks empty.
+      const allRosterNames = primary.concat(others);
+      const customOption = (e.name && !allRosterNames.includes(e.name))
+        ? `<option value="${e.name}" selected>${e.name}</option><option disabled>── Roster ──</option>`
+        : '';
       return `
       <div class="employee-entry">
         <div class="emp-row-top">
           <select class="emp-name" onchange="updateEmployee(${e.id}, 'name', this.value)">
             <option value="">-- Select --</option>
-            ${nameOptions}
+            ${customOption}${nameOptions}
           </select>
           <button class="emp-remove" onclick="removeEmployee(${e.id})">&times;</button>
         </div>
