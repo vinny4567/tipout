@@ -932,8 +932,10 @@ async function loadTodaysSchedule() {
     const data = await res.json();
     const roster = data.roster || [];
 
-    // Clear current employees and replace with today's roster
+    // Hard reset — wipe employees array, localStorage, and id counter so no stale empty rows remain
     employees = [];
+    nextId = 1;
+    try { localStorage.removeItem('employees'); localStorage.removeItem('nextId'); } catch (e) {}
     let added = 0, skipped = 0;
     const seen = new Set();
     roster.forEach(person => {
@@ -955,6 +957,9 @@ async function loadTodaysSchedule() {
       });
       added++;
     });
+
+    // Final safety: drop any entry that ended up with an empty name
+    employees = employees.filter(e => e.name && e.name.trim() !== '');
 
     renderEmployees();
     persistEmployees();
