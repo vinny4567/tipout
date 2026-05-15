@@ -1179,6 +1179,12 @@ function renderEmployees() {
             <option value="">-- Select --</option>
             ${nameOptions}
           </select>
+          <select class="emp-name" style="max-width:90px;font-size:12px" onchange="updateEmployee(${e.id}, 'role', this.value)" title="Change role">
+            <option value="Server" ${e.role==='Server'?'selected':''}>Server</option>
+            <option value="Bartender" ${e.role==='Bartender'?'selected':''}>Bar</option>
+            <option value="Busser" ${e.role==='Busser'?'selected':''}>Busser</option>
+            <option value="Runner" ${e.role==='Runner'?'selected':''}>Runner</option>
+          </select>
           <button class="emp-remove" onclick="removeEmployee(${e.id})">&times;</button>
         </div>
         <div class="emp-row-bottom" ${!e.name ? 'style="opacity:0.4; pointer-events:none;"' : ''}>
