@@ -931,12 +931,19 @@ async function loadTodaysSchedule() {
     // Clear current employees and replace with today's roster
     employees = [];
     let added = 0, skipped = 0;
+    const seen = new Set();
     roster.forEach(person => {
       const role = mapPositionToRole(person.position);
       if (!role) { skipped++; return; }
+      const name = (person.fullName || '').trim();
+      // Skip placeholder/empty shifts and exact duplicates (same name + role)
+      if (!name) { skipped++; return; }
+      const key = role + '|' + name.toLowerCase();
+      if (seen.has(key)) { skipped++; return; }
+      seen.add(key);
       employees.push({
         id: nextId++,
-        name: person.fullName,
+        name,
         role,
         hours: 0,
         svcChg: 0,
