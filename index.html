@@ -895,11 +895,15 @@ const SCHEDULER_ROSTER_URL = 'https://restaurant-scheduler-hh5e.onrender.com/api
 const SCHEDULER_API_KEY = 'tipout-roster-key-vinny-7k9m2x4p';
 
 function mapPositionToRole(pos) {
-  const p = (pos || '').toLowerCase();
-  if (p.includes('bartender') || p.includes(' bar') || p === 'bar') return 'Bartender';
-  if (p.includes('busser')) return 'Busser';
-  if (p.includes('runner')) return 'Runner';
-  if (p.includes('server') || p.includes('waitress') || p.includes('waiter')) return 'Server';
+  const p = (pos || '').toLowerCase().trim();
+  // Food Runner — check FIRST so "FR", "F.R.", "food runner" don't get caught by other rules
+  if (p === 'fr' || p === 'f.r.' || p === 'f r' || p === 'food runner' || p === 'food run' || p.includes('runner') || p.includes('food run')) return 'Runner';
+  // Bartender
+  if (p === 'bt' || p === 'bar' || p === 'bartend' || p.includes('bartender') || p.endsWith(' bar')) return 'Bartender';
+  // Busser
+  if (p === 'bu' || p === 'bus' || p === 'busser' || p.includes('busser') || p.includes('busboy')) return 'Busser';
+  // Server (incl. waiter/waitress abbreviations)
+  if (p === 'sv' || p === 'srv' || p === 'sr' || p === 'server' || p === 'waiter' || p === 'waitress' || p.includes('server') || p.includes('waitress') || p.includes('waiter')) return 'Server';
   return null; // unmapped — skip (manager, host, cook, etc.)
 }
 
