@@ -891,6 +891,7 @@ function persistEmployees() {
 
 // ─── Load Today's Schedule from Restaurant Scheduler ─────────────────────────
 const SCHEDULER_ROSTER_URL = 'https://restaurant-scheduler-hh5e.onrender.com/api/roster/today';
+const SCHEDULER_EMPLOYEES_URL = 'https://schedule.angeliscatering.com/api/roster/employees';
 const SCHEDULER_API_KEY = 'tipout-roster-key-vinny-7k9m2x4p';
 
 function mapPositionToRole(pos) {
@@ -904,6 +905,73 @@ function mapPositionToRole(pos) {
   // Server (incl. waiter/waitress abbreviations)
   if (p === 'sv' || p === 'srv' || p === 'sr' || p === 'server' || p === 'waiter' || p === 'waitress' || p.includes('server') || p.includes('waitress') || p.includes('waiter')) return 'Server';
   return null; // unmapped — skip (manager, host, cook, etc.)
+}
+
+// ─── Auto-sync roster from scheduler ─────────────────────────
+// On each app load, pull the scheduler's full active-employee list and merge
+// any names that aren't already in the local roster. Purely additive — never
+// removes or modifies existing entries. Existing names that already match are
+// skipped. Also pushes each new name to the Google Sheet via the addEmployee
+// endpoint (which is itself idempotent, so re-runs are safe).
+async function syncRosterFromScheduler() {
+  try {
+    const response = await fetch(SCHEDULER_EMPLOYEES_URL, {
+      headers: { 'x-api-key': SCHEDULER_API_KEY }
+    });
+    if (!response.ok) {
+      console.log('syncRosterFromScheduler: HTTP ' + response.status);
+      return;
+    }
+    const employees = await response.json();
+    if (!Array.isArray(employees)) return;
+
+    const custom = JSON.parse(localStorage.getItem('customRoster') || '{}');
+    let added = 0;
+
+    employees.forEach(function(emp) {
+      const name = ((emp || {}).name || '').toString().trim().replace(/\s+/g, ' ');
+      if (!name) return;
+
+      // Pick the first position that maps to a tipout role
+      let role = null;
+      const positions = (emp.positions || []);
+      for (let i = 0; i < positions.length; i++) {
+        const r = mapPositionToRole((positions[i] || {}).name);
+        if (r) { role = r; break; }
+      }
+      if (!role) return; // no tipped position — skip
+
+      // Already in tipout's roster (case-insensitive match)? Skip.
+      if (roster[role] && roster[role].some(function(n) {
+        return (n || '').toLowerCase() === name.toLowerCase();
+      })) return;
+
+      // Add to in-memory roster
+      if (!roster[role]) roster[role] = [];
+      roster[role].push(name);
+
+      // Persist to customRoster localStorage
+      if (!custom[role]) custom[role] = [];
+      if (!custom[role].includes(name)) custom[role].push(name);
+
+      // Push to Google Sheet — idempotent, no-op if already there
+      try { sendEmployeeToSheet(name, role); } catch(e) {}
+
+      added++;
+    });
+
+    if (added > 0) {
+      localStorage.setItem('customRoster', JSON.stringify(custom));
+      Object.keys(roster).forEach(function(r) { roster[r].sort(sortByFirst); });
+      // Refresh any dropdowns / roster UI that's currently rendered
+      try { renderEmployees(); } catch(e) {}
+      try { renderPartyEmployees(); } catch(e) {}
+      try { renderRoster(); } catch(e) {}
+      console.log('Tipout roster: added ' + added + ' new employee(s) from scheduler');
+    }
+  } catch (err) {
+    console.error('syncRosterFromScheduler error:', err);
+  }
 }
 
 async function loadTodaysSchedule() {
@@ -2364,6 +2432,9 @@ init();
 initParty();
 loadGoogleUrl();
 updatePendingCount();
+// Fire-and-forget: pull the scheduler's current employees and merge any new
+// names into the local roster. Purely additive — won't touch existing entries.
+syncRosterFromScheduler();
 // --- Custom Dialpad ---
 var dialpadTarget = null;
 var dialpadValue = '';
