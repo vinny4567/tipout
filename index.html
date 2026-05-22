@@ -893,6 +893,38 @@ function persistEmployees() {
 const SCHEDULER_ROSTER_URL = 'https://restaurant-scheduler-hh5e.onrender.com/api/roster/today';
 const SCHEDULER_EMPLOYEES_URL = 'https://schedule.angeliscatering.com/api/roster/employees';
 const SCHEDULER_API_KEY = 'tipout-roster-key-vinny-7k9m2x4p';
+const TIPOUT_LOG_URL = 'https://restaurant-scheduler-hh5e.onrender.com/api/tipout-log';
+// Cloud copy of the saved-report log (so it's the same on every device, never wiped)
+let tipoutLogCache = null;
+async function loadLogFromCloud() {
+  try {
+    const r = await fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY));
+    if (r.ok) {
+      const data = await r.json();
+      tipoutLogCache = Array.isArray(data.log) ? data.log : [];
+      return true;
+    }
+  } catch (e) { console.error('load log from cloud', e); }
+  return false;
+}
+// One-time: push any pre-existing local log entries up to the cloud
+async function migrateLocalLogToCloud() {
+  if (localStorage.getItem('tipoutLogMigrated') === '1') return;
+  let local = [];
+  try { local = JSON.parse(localStorage.getItem('tipoutLog') || '[]'); } catch (e) {}
+  if (!local.length) { localStorage.setItem('tipoutLogMigrated', '1'); return; }
+  local.forEach(function (e, i) {
+    if (!e.id) e.id = 'Lmig' + String(e.savedAt || e.date || i).replace(/[^a-zA-Z0-9]/g, '');
+  });
+  try {
+    const r = await fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entries: local }),
+    });
+    if (r.ok) localStorage.setItem('tipoutLogMigrated', '1');
+  } catch (e) { console.error('migrate log', e); }
+}
 
 function mapPositionToRole(pos) {
   const p = (pos || '').toLowerCase().trim();
@@ -2654,15 +2686,42 @@ function saveToLog() {
     entry.direct.push({ name: t.name, role: t.role, tips: t.tips });
   });
 
-  var log = JSON.parse(localStorage.getItem('tipoutLog') || '[]');
-  log.unshift(entry);
-  localStorage.setItem('tipoutLog', JSON.stringify(log));
-  alert('Saved to log for ' + dateStr);
+  entry.id = 'L' + Date.now() + Math.random().toString(36).slice(2, 7);
+  // Save to the cloud so the log is the same on every device
+  fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry),
+  }).then(function (r) {
+    if (r.ok) {
+      loadLogFromCloud().then(function () { renderLog(); });
+      alert('Saved to log for ' + dateStr);
+    } else {
+      throw new Error('HTTP ' + r.status);
+    }
+  }).catch(function () {
+    // Cloud unreachable — keep a local copy so nothing is lost
+    var log = JSON.parse(localStorage.getItem('tipoutLog') || '[]');
+    log.unshift(entry);
+    localStorage.setItem('tipoutLog', JSON.stringify(log));
+    localStorage.removeItem('tipoutLogMigrated'); // re-migrate when back online
+    alert('Saved locally for ' + dateStr + ' (cloud unreachable — will sync when back online)');
+  });
 }
 
 function renderLog() {
-  var log = JSON.parse(localStorage.getItem('tipoutLog') || '[]');
   var el = document.getElementById('logContent');
+  if (tipoutLogCache === null) {
+    el.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:40px 0;">Loading…</div>';
+    migrateLocalLogToCloud()
+      .then(function () { return loadLogFromCloud(); })
+      .then(function () {
+        if (tipoutLogCache === null) tipoutLogCache = [];
+        renderLog();
+      });
+    return;
+  }
+  var log = tipoutLogCache;
   if (log.length === 0) {
     el.innerHTML = '<div style="text-align:center; color:var(--text-muted); padding:40px 0;">No saved reports yet.</div>';
     return;
@@ -2677,7 +2736,7 @@ function renderLog() {
     var totalStaff = totalServers + entry.bartenders.length + entry.bussers.length + entry.runners.length;
     html += '<div class="log-entry-meta">' + totalStaff + ' employees</div></div>';
     html += '<div style="display:flex; align-items:center; gap:10px;">';
-    html += '<button class="log-delete" onclick="event.stopPropagation(); deleteLogEntry(' + i + ')">&times;</button>';
+    html += '<button class="log-delete" onclick="event.stopPropagation(); deleteLogEntry(\'' + entry.id + '\')">&times;</button>';
     html += '<span class="log-entry-arrow">&#9654;</span>';
     html += '</div></div>';
 
@@ -2733,16 +2792,23 @@ function renderLog() {
   el.innerHTML = html;
 }
 
-function deleteLogEntry(index) {
-  var log = JSON.parse(localStorage.getItem('tipoutLog') || '[]');
-  log.splice(index, 1);
-  localStorage.setItem('tipoutLog', JSON.stringify(log));
+function deleteLogEntry(id) {
+  if (!confirm('Delete this log entry?')) return;
+  fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY) + '&id=' + encodeURIComponent(id), { method: 'DELETE' })
+    .catch(function () {});
+  tipoutLogCache = (tipoutLogCache || []).filter(function (e) { return e.id !== id; });
   renderLog();
 }
 
-function clearLog() {
+async function clearLog() {
   if (!confirm('Delete all log entries?')) return;
-  localStorage.removeItem('tipoutLog');
+  var entries = (tipoutLogCache || []).slice();
+  for (var i = 0; i < entries.length; i++) {
+    try {
+      await fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY) + '&id=' + encodeURIComponent(entries[i].id), { method: 'DELETE' });
+    } catch (e) {}
+  }
+  tipoutLogCache = [];
   renderLog();
 }
 
