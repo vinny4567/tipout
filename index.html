@@ -831,7 +831,7 @@ let nextId = 1;
 const roster = {
   Bartender: [
     'Haley Cassells', 'Kirsten O\'Hara', 'Martin Rife', 'Michael Goodwin',
-    'Nancy Newell', 'Pricilla Lagace', 'Robin Jaramillo', 'Gyselle Tavizon'
+    'Nancy Newell', 'Priscilla Lagace', 'Robin Jaramillo', 'Gyselle Tavizon'
   ],
   Server: [
     'Ashley Penick', 'Ava Fangmann', 'Emma Dawson', 'Colleen Morgan',
@@ -871,6 +871,50 @@ try {
     }
   });
 } catch(e) {}
+
+// One-time migration: rename "Pricilla Lagace" / "Priscill Lagace" → "Priscilla Lagace"
+// across localStorage so cached rosters/employees use the correct spelling.
+try {
+  if (!localStorage.getItem('priscillaMigrationDone')) {
+    const BAD_NAMES = ['Pricilla Lagace', 'Priscill Lagace'];
+    const GOOD_NAME = 'Priscilla Lagace';
+    ['customRoster', 'removedRoster'].forEach(key => {
+      try {
+        const obj = JSON.parse(localStorage.getItem(key) || '{}');
+        let touched = false;
+        Object.keys(obj).forEach(role => {
+          if (Array.isArray(obj[role])) {
+            obj[role] = obj[role].map(n => BAD_NAMES.includes(n) ? GOOD_NAME : n);
+            touched = true;
+          }
+        });
+        if (touched) localStorage.setItem(key, JSON.stringify(obj));
+      } catch (_) {}
+    });
+    try {
+      const emps = JSON.parse(localStorage.getItem('employees') || 'null');
+      if (Array.isArray(emps)) {
+        emps.forEach(e => { if (e && BAD_NAMES.includes(e.name)) e.name = GOOD_NAME; });
+        localStorage.setItem('employees', JSON.stringify(emps));
+      }
+    } catch (_) {}
+    try {
+      const party = JSON.parse(localStorage.getItem('partyEmps') || 'null');
+      if (Array.isArray(party)) {
+        party.forEach(e => { if (e && BAD_NAMES.includes(e.name)) e.name = GOOD_NAME; });
+        localStorage.setItem('partyEmps', JSON.stringify(party));
+      }
+    } catch (_) {}
+    // Also fix in-memory roster (the hardcoded list above is already correct,
+    // but a cached customRoster may have re-added the misspelling)
+    Object.keys(roster).forEach(role => {
+      if (Array.isArray(roster[role])) {
+        roster[role] = roster[role].map(n => BAD_NAMES.includes(n) ? GOOD_NAME : n);
+      }
+    });
+    localStorage.setItem('priscillaMigrationDone', '1');
+  }
+} catch (_) {}
 // Load custom roster additions from localStorage
 try {
   const custom = JSON.parse(localStorage.getItem('customRoster') || '{}');
