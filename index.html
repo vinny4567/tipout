@@ -1108,19 +1108,32 @@ function init() {
     if (Array.isArray(saved) && saved.length > 0) {
       // If the saved state is from a previous day, zero out the per-day
       // fields (hours / svcChg / cash) so yesterday's tips can't accidentally
-      // sync into today's column. Keep names + roles intact.
+      // sync into today's column. Keep names + roles intact. Also clears
+      // directTips, partyEmps tip-amounts, and the party-tip input so the
+      // ENTIRE report restarts blank on a new day.
       if (savedDate && savedDate !== today) {
         saved.forEach(function(e) {
           if (e) { e.hours = 0; e.svcChg = 0; e.cash = 0; }
         });
         try { localStorage.setItem('employees', JSON.stringify(saved)); } catch (_) {}
         try { localStorage.setItem('employeesDate', today); } catch (_) {}
+        // Direct Tips — wipe the array entirely (per-day entries, not roster)
+        try { localStorage.setItem('directTips', '[]'); } catch (_) {}
+        // Private Party — zero hours on rows, clear the tip-amount input
+        try {
+          var sp = JSON.parse(localStorage.getItem('partyEmps') || 'null');
+          if (Array.isArray(sp)) {
+            sp.forEach(function (e) { if (e) e.hours = 0; });
+            localStorage.setItem('partyEmps', JSON.stringify(sp));
+          }
+          localStorage.setItem('partyTip', '');
+        } catch (_) {}
         try {
           var banner = document.getElementById('staleBanner');
           if (banner) {
-            banner.textContent = 'Tips from ' + savedDate + ' cleared — enter today’s fresh.';
+            banner.textContent = 'Yesterday’s tips (' + savedDate + ') cleared from Employees, Direct Tips, and Private Party — enter today’s fresh.';
             banner.style.display = 'block';
-            setTimeout(function () { banner.style.display = 'none'; }, 8000);
+            setTimeout(function () { banner.style.display = 'none'; }, 10000);
           }
         } catch (_) {}
       }
