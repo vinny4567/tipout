@@ -601,6 +601,8 @@
 
 <div class="container">
 
+  <div id="staleBanner" style="display:none; margin:8px 12px; padding:10px 14px; background:#fef3c7; color:#92400e; border:1px solid #f59e0b; border-radius:6px; font-size:14px; font-weight:500;"></div>
+
   <!-- DIRECT TIPS PANEL -->
   <div class="panel" id="panel-direct">
     <div class="card">
@@ -882,10 +884,16 @@ try {
 } catch(e) {}
 Object.keys(roster).forEach(r => roster[r].sort(sortByFirst));
 
+function todayKey() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
 function persistEmployees() {
   try {
     localStorage.setItem('employees', JSON.stringify(employees));
     localStorage.setItem('nextId', String(nextId));
+    localStorage.setItem('employeesDate', todayKey());
   } catch(e) {}
 }
 
@@ -1096,7 +1104,26 @@ function init() {
   try {
     var saved = JSON.parse(localStorage.getItem('employees') || 'null');
     var savedId = parseInt(localStorage.getItem('nextId') || '0');
+    var savedDate = localStorage.getItem('employeesDate') || '';
     if (Array.isArray(saved) && saved.length > 0) {
+      // If the saved state is from a previous day, zero out the per-day
+      // fields (hours / svcChg / cash) so yesterday's tips can't accidentally
+      // sync into today's column. Keep names + roles intact.
+      if (savedDate && savedDate !== today) {
+        saved.forEach(function(e) {
+          if (e) { e.hours = 0; e.svcChg = 0; e.cash = 0; }
+        });
+        try { localStorage.setItem('employees', JSON.stringify(saved)); } catch (_) {}
+        try { localStorage.setItem('employeesDate', today); } catch (_) {}
+        try {
+          var banner = document.getElementById('staleBanner');
+          if (banner) {
+            banner.textContent = 'Tips from ' + savedDate + ' cleared — enter today’s fresh.';
+            banner.style.display = 'block';
+            setTimeout(function () { banner.style.display = 'none'; }, 8000);
+          }
+        } catch (_) {}
+      }
       employees = saved;
       nextId = savedId || (saved.length + 1);
       restored = true;
