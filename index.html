@@ -1083,12 +1083,13 @@ async function loadTodaysSchedule() {
     const data = await res.json();
     const roster = data.roster || [];
 
-    // Hard reset — wipe employees array, localStorage, and id counter so no stale empty rows remain
-    employees = [];
-    nextId = 1;
-    try { localStorage.removeItem('employees'); localStorage.removeItem('nextId'); } catch (e) {}
-    let added = 0, skipped = 0;
-    const seen = new Set();
+    // Preserve people you added manually; only refresh the SCHEDULED staff. (No more silently
+    // wiping manual adds — that was the "I keep losing people I added" bug.)
+    const manualKeep = employees.filter(e => e.manual && e.name && e.name.trim() !== '');
+    employees = manualKeep.slice();
+    nextId = employees.reduce((mx, e) => Math.max(mx, (e.id || 0) + 1), 1);
+    let added = 0, skipped = 0, kept = manualKeep.length;
+    const seen = new Set(manualKeep.map(e => e.role + '|' + e.name.trim().toLowerCase()));
     roster.forEach(person => {
       const role = mapPositionToRole(person.position);
       if (!role) { skipped++; return; }
@@ -1124,7 +1125,7 @@ async function loadTodaysSchedule() {
         .filter(x => x.n > 0)
         .map(x => `${x.n} ${x.r}${x.n!==1?'s':''}`)
         .join(', ');
-      status.textContent = `✓ ${added} loaded (${data.date}): ${breakdown}${skipped ? ` · ${skipped} skipped` : ''}`;
+      status.textContent = `✓ ${added} loaded (${data.date}): ${breakdown}${kept ? ` · ${kept} manual kept` : ''}${skipped ? ` · ${skipped} skipped` : ''}`;
       status.style.color = 'var(--green)';
     }
   } catch (err) {
@@ -1305,7 +1306,7 @@ function removeFromRoster(role, name) {
 }
 
 function addEmployee(role = 'Server') {
-  employees.push({ id: nextId++, name: '', role, hours: 0, svcChg: 0, cash: 0 });
+  employees.push({ id: nextId++, name: '', role, hours: 0, svcChg: 0, cash: 0, manual: true });
   renderEmployees();
   persistEmployees();
 }
@@ -1394,7 +1395,12 @@ function renderEmployees() {
         const taken = n !== e.name && takenInRole.includes(n);
         return `<option value="${n}" ${e.name === n ? 'selected' : ''} ${taken ? 'disabled style="color:#5c6070;"' : ''}>${n}${taken ? ' (on shift)' : ''}</option>`;
       }).join('');
-      const nameOptions = primaryOpts + (otherOpts ? `<option disabled>── Other ──</option>` + otherOpts : '');
+      // Always show the person's saved name as a selectable option, even if it isn't in the roster
+      // (scheduler names, custom adds). Without this the name renders blank after a reload/re-render
+      // and the person looks "lost" even though their row is still saved.
+      const inRoster = primary.includes(e.name) || others.includes(e.name);
+      const customOpt = (e.name && !inRoster) ? `<option value="${e.name}" selected>${e.name}</option>` : '';
+      const nameOptions = customOpt + primaryOpts + (otherOpts ? `<option disabled>── Other ──</option>` + otherOpts : '');
       return `
       <div class="employee-entry">
         <div class="emp-row-top">
