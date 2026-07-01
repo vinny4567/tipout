@@ -2367,6 +2367,12 @@ function buildSyncPayload() {
     if (r.name) entries.push({ name: r.name, role: 'Runner', tips: r.tipReceived, type: 'tipout' });
   });
 
+  // Busser Pool total — in Busser Pool Mode, sync the night's pool to the
+  // "Busser Pool" row so it shows in the sheet per day (matched by name).
+  if (s.busserPoolMode && data.busserPool > 0) {
+    entries.push({ name: 'Busser Pool', role: 'Busser', tips: data.busserPool, type: 'pool' });
+  }
+
   // Private party
   getPartyEntries().forEach(function(e) { entries.push(e); });
 
