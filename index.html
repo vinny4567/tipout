@@ -1161,16 +1161,13 @@ function init() {
     var savedId = parseInt(localStorage.getItem('nextId') || '0');
     var savedDate = localStorage.getItem('employeesDate') || '';
     if (Array.isArray(saved) && saved.length > 0) {
-      // If the saved state is from a previous day, zero out the per-day
-      // fields (hours / svcChg / cash) so yesterday's tips can't accidentally
-      // sync into today's column. Keep names + roles intact. Also clears
-      // directTips, partyEmps tip-amounts, and the party-tip input so the
-      // ENTIRE report restarts blank on a new day.
       if (savedDate && savedDate !== today) {
-        saved.forEach(function(e) {
-          if (e) { e.hours = 0; e.svcChg = 0; e.cash = 0; }
-        });
-        try { localStorage.setItem('employees', JSON.stringify(saved)); } catch (_) {}
+        // NEW DAY — do NOT carry last night's crew into today. Otherwise last
+        // night's staff (and manual adds especially, which survive "Load Today's
+        // Schedule") reappear every day. Clear the saved crew + per-day extras;
+        // the fresh default layout loads below and you tap Load Today's Schedule.
+        employees = [];
+        try { localStorage.removeItem('employees'); localStorage.removeItem('nextId'); } catch (_) {}
         try { localStorage.setItem('employeesDate', today); } catch (_) {}
         // Direct Tips — wipe the array entirely (per-day entries, not roster)
         try { localStorage.setItem('directTips', '[]'); } catch (_) {}
@@ -1186,15 +1183,19 @@ function init() {
         try {
           var banner = document.getElementById('staleBanner');
           if (banner) {
-            banner.textContent = 'Yesterday’s tips (' + savedDate + ') cleared from Employees, Direct Tips, and Private Party — enter today’s fresh.';
+            banner.textContent = 'New day — last night’s crew cleared. Tap “Load Today’s Schedule” for tonight’s staff.';
             banner.style.display = 'block';
             setTimeout(function () { banner.style.display = 'none'; }, 10000);
           }
         } catch (_) {}
+        // Leave restored = false so the fresh default layout loads below.
+      } else {
+        // Same day — preserve the full in-progress state (names + values) so a
+        // mid-shift refresh doesn't lose anything.
+        employees = saved;
+        nextId = savedId || (saved.length + 1);
+        restored = true;
       }
-      employees = saved;
-      nextId = savedId || (saved.length + 1);
-      restored = true;
     }
   } catch(e) {}
 
