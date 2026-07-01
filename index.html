@@ -657,6 +657,14 @@
     </div>
 
     <div class="card">
+      <div class="card-title">Busser Pool Mode</div>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--text);">
+        <input type="checkbox" id="busserPoolMode" onchange="saveSettings(); applyBusserPoolMode();" style="width:20px;height:20px;flex:none;cursor:pointer;">
+        <span>Pool busser tips instead of entering hours nightly. The busser share still comes out of server tips every night and is logged by date — you just don't enter bussers. Split by hours from the timesheet at payroll.</span>
+      </label>
+    </div>
+
+    <div class="card">
       <div class="card-title">Report Info</div>
       <div class="settings-grid">
         <div class="setting-item">
@@ -697,6 +705,8 @@
   <!-- EMPLOYEE INPUT PANEL -->
   <div class="panel active" id="panel-input">
 
+    <div id="busserPoolBanner" style="display:none;margin-bottom:12px;padding:12px 16px;background:#064e3b;color:#d1fae5;border:1px solid #10b981;border-radius:8px;font-size:14px;text-align:center;"></div>
+
     <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       <div style="flex:1;min-width:200px">
         <div style="font-weight:700;color:var(--text);font-size:15px">Load Today's Schedule</div>
@@ -717,7 +727,7 @@
       <button class="add-emp-btn" onclick="addEmployee('Bartender')">+ Add Bartender</button>
     </div>
 
-    <div class="card">
+    <div class="card" id="busserEntryCard">
       <div class="card-title">Bussers</div>
       <div id="employeeList-Busser"></div>
       <button class="add-emp-btn" onclick="addEmployee('Busser')">+ Add Busser</button>
@@ -1362,9 +1372,9 @@ function updateTakeHome() {
     if (!totalTips) { el.value = ''; return; }
     const runnerTipout = hasRunners ? Math.floor(totalTips / 100) * s.runnerPer100 : 0;
     const adjustedTotal = totalTips - runnerTipout;
-    const twentyPctTipout = (hasBartenders || hasBussers) ? Math.floor(adjustedTotal * s.tipoutPct * 100) / 100 : 0;
+    const twentyPctTipout = (hasBartenders || hasBussers || s.busserPoolMode) ? Math.floor(adjustedTotal * s.tipoutPct * 100) / 100 : 0;
     const barTipout = hasBartenders ? Math.floor(twentyPctTipout * s.barShare * 100) / 100 : 0;
-    const busserTipout = hasBussers ? Math.floor(twentyPctTipout * s.busserShare * 100) / 100 : 0;
+    const busserTipout = (hasBussers || s.busserPoolMode) ? Math.floor(twentyPctTipout * s.busserShare * 100) / 100 : 0;
     const remaining = Math.floor((totalTips - runnerTipout - barTipout - busserTipout) * 100) / 100;
     el.value = '$' + remaining.toFixed(2);
   });
@@ -1442,6 +1452,7 @@ function getSettings() {
     runnerPer100: parseFloat(document.getElementById('runnerPer100').value) || 5,
     busserShare: (parseFloat(document.getElementById('busserShare').value) || 75) / 100,
     barShare: (parseFloat(document.getElementById('barShare').value) || 25) / 100,
+    busserPoolMode: !!(document.getElementById('busserPoolMode') && document.getElementById('busserPoolMode').checked),
     manager: document.getElementById('managerName').value || 'Manager',
     date: document.getElementById('reportDate').value,
   };
@@ -1452,12 +1463,72 @@ function saveSettings() {
   // Persist Google Script URL
   const gUrl = document.getElementById('googleScriptUrl');
   if (gUrl) localStorage.setItem('tipout_google_url', gUrl.value);
+  // Persist Busser Pool Mode
+  const bpm = document.getElementById('busserPoolMode');
+  if (bpm) localStorage.setItem('busserPoolMode', bpm.checked ? '1' : '0');
 }
 
 function loadGoogleUrl() {
   const saved = localStorage.getItem('tipout_google_url');
   const el = document.getElementById('googleScriptUrl');
   if (saved && el) el.value = saved;
+  // Restore Busser Pool Mode
+  const bpm = document.getElementById('busserPoolMode');
+  if (bpm) bpm.checked = localStorage.getItem('busserPoolMode') === '1';
+  applyBusserPoolMode();
+}
+
+// ─── Busser Pool Mode ──────────────────────────────────────────────
+// When ON: the Bussers entry card is hidden (you don't enter bussers nightly),
+// and the busser share is still collected from server tips + logged by date.
+// The running period total is shown so you can watch the pool build.
+function applyBusserPoolMode() {
+  var on = !!(document.getElementById('busserPoolMode') && document.getElementById('busserPoolMode').checked);
+  var card = document.getElementById('busserEntryCard');
+  if (card) card.style.display = on ? 'none' : '';
+  var banner = document.getElementById('busserPoolBanner');
+  if (banner) banner.style.display = on ? '' : 'none';
+  try { updateBusserPoolBanner(); } catch (e) {}
+  try { renderEmployees(); updateTakeHome(); } catch (e) {}
+}
+
+// Current 14-day pay period, anchored to Mar 23 2026 (matches the payroll cycle).
+function currentPayPeriod() {
+  var anchor = new Date(2026, 2, 23);           // Mar 23 2026
+  var now = new Date();
+  var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  var days = Math.floor((today - anchor) / 86400000);
+  var periods = Math.floor(days / 14);
+  var start = new Date(anchor.getTime() + periods * 14 * 86400000);
+  var end = new Date(start.getTime() + 13 * 86400000);
+  return { start: start, end: end };
+}
+
+// Sum the logged busser pools for the current pay period (from the cloud/local log).
+function busserPoolThisPeriod() {
+  var pp = currentPayPeriod();
+  var log = tipoutLogCache || [];
+  var total = 0, nights = 0;
+  log.forEach(function (e) {
+    if (!e || !e.date || !e.pools) return;
+    var p = e.date.split('/');                   // MM/DD/YYYY
+    if (p.length !== 3) return;
+    var d = new Date(parseInt(p[2], 10), parseInt(p[0], 10) - 1, parseInt(p[1], 10));
+    if (d >= pp.start && d <= pp.end) {
+      total += (typeof e.pools.busser === 'number' ? e.pools.busser : 0);
+      nights++;
+    }
+  });
+  return { total: total, nights: nights, period: pp };
+}
+
+function updateBusserPoolBanner() {
+  var banner = document.getElementById('busserPoolBanner');
+  if (!banner) return;
+  var info = busserPoolThisPeriod();
+  var fmtDate = function (d) { return (d.getMonth() + 1) + '/' + d.getDate(); };
+  banner.innerHTML = 'Busser Pool this pay period (' + fmtDate(info.period.start) + '–' + fmtDate(info.period.end) + '): ' +
+    '<strong>$' + info.total.toFixed(2) + '</strong> &middot; ' + info.nights + ' night' + (info.nights === 1 ? '' : 's') + ' logged';
 }
 
 function refreshDateToToday() {
@@ -1495,12 +1566,13 @@ function calculate() {
     // Runner tipout only if runners are on shift
     const runnerTipout = hasRunners ? Math.floor(totalTips / 100) * s.runnerPer100 : 0;
     const adjustedTotal = totalTips - runnerTipout;
-    // 20% always comes off if bartenders are on shift (they always get tipped)
-    const twentyPctTipout = (hasBartenders || hasBussers) ? Math.floor(adjustedTotal * s.tipoutPct * 100) / 100 : 0;
+    // 20% comes off if bartenders or bussers are on shift — or if Busser Pool Mode
+    // is on (the busser share is collected nightly even without bussers entered)
+    const twentyPctTipout = (hasBartenders || hasBussers || s.busserPoolMode) ? Math.floor(adjustedTotal * s.tipoutPct * 100) / 100 : 0;
     // Bar always gets their cut if bartenders are present
     const barTipout = hasBartenders ? Math.floor(twentyPctTipout * s.barShare * 100) / 100 : 0;
-    // Bussers only get their cut if bussers are on shift; otherwise servers keep it
-    const busserTipout = hasBussers ? Math.floor(twentyPctTipout * s.busserShare * 100) / 100 : 0;
+    // Bussers get their cut if on shift OR if Busser Pool Mode is on (pooled for payroll)
+    const busserTipout = (hasBussers || s.busserPoolMode) ? Math.floor(twentyPctTipout * s.busserShare * 100) / 100 : 0;
     // Servers keep: total - runner - bar tipout - busser tipout (if no bussers, that portion stays)
     const remaining = Math.floor((totalTips - runnerTipout - barTipout - busserTipout) * 100) / 100;
 
@@ -2554,6 +2626,8 @@ init();
 initParty();
 loadGoogleUrl();
 updatePendingCount();
+// Load the tipout log so the Busser Pool running total is accurate on open
+loadLogFromCloud().then(function () { try { updateBusserPoolBanner(); } catch (e) {} });
 // Fire-and-forget: pull the scheduler's current employees and merge any new
 // names into the local roster. Purely additive — won't touch existing entries.
 syncRosterFromScheduler();
@@ -2784,7 +2858,7 @@ function saveToLog() {
     body: JSON.stringify(entry),
   }).then(function (r) {
     if (r.ok) {
-      loadLogFromCloud().then(function () { renderLog(); });
+      loadLogFromCloud().then(function () { renderLog(); try { updateBusserPoolBanner(); } catch (e) {} });
       alert('Saved to log for ' + dateStr);
     } else {
       throw new Error('HTTP ' + r.status);
