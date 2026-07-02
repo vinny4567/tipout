@@ -186,35 +186,18 @@
   .emp-name:focus { border-color: var(--accent); }
 
   .emp-role-select {
-    padding: 10px 8px;
+    padding: 10px 12px;
     background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 8px;
     color: var(--text);
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 700;
     outline: none;
     cursor: pointer;
-    min-width: 96px;
-    flex-shrink: 0;
+    min-width: 110px;
   }
   .emp-role-select:focus { border-color: var(--accent); }
-
-  .emp-edit {
-    width: 34px;
-    height: 34px;
-    border-radius: 8px;
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    font-size: 17px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-  .emp-edit:hover { background: var(--surface); color: var(--accent); }
 
   .emp-remove {
     width: 34px;
@@ -1345,32 +1328,6 @@ function removeEmployee(id) {
   persistEmployees();
 }
 
-// Move an employee to a different role/section (e.g. Busser → Server) without
-// removing + re-adding. They jump to the new section on re-render.
-function changeEmployeeRole(id, newRole) {
-  const emp = employees.find(e => e.id === id);
-  if (!emp || emp.role === newRole) return;
-  emp.role = newRole;
-  renderEmployees();
-  persistEmployees();
-  setTimeout(updateTakeHome, 0);
-}
-
-// Edit a person's name — e.g. fix a nickname to their exact roster/sheet name so
-// the Google Sheet sync matches the right row.
-function editEmployeeName(id) {
-  const emp = employees.find(e => e.id === id);
-  if (!emp) return;
-  const val = prompt('Edit name (use their full name so the sheet matches):', emp.name || '');
-  if (val === null) return; // cancelled
-  const clean = val.trim().replace(/\s+/g, ' ');
-  emp.name = clean;
-  if (clean) emp.manual = true; // keep the corrected name through Load Schedule (cleared next day)
-  renderEmployees();
-  persistEmployees();
-  setTimeout(updateTakeHome, 0);
-}
-
 function updateEmployee(id, field, value) {
   const emp = employees.find(e => e.id === id);
   if (!emp) return;
@@ -1461,13 +1418,6 @@ function renderEmployees() {
           <select class="emp-name" onchange="updateEmployee(${e.id}, 'name', this.value)">
             <option value="">-- Select --</option>
             ${nameOptions}
-          </select>
-          <button class="emp-edit" title="Edit name" onclick="editEmployeeName(${e.id})">✎</button>
-          <select class="emp-role-select" title="Change role" onchange="changeEmployeeRole(${e.id}, this.value)">
-            <option value="Server" ${e.role === 'Server' ? 'selected' : ''}>Server</option>
-            <option value="Bartender" ${e.role === 'Bartender' ? 'selected' : ''}>Bartender</option>
-            <option value="Busser" ${e.role === 'Busser' ? 'selected' : ''}>Busser</option>
-            <option value="Runner" ${e.role === 'Runner' ? 'selected' : ''}>Runner</option>
           </select>
           <button class="emp-remove" onclick="removeEmployee(${e.id})">&times;</button>
         </div>
