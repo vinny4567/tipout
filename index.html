@@ -221,6 +221,9 @@
   .roster-name:hover { background: var(--surface2); }
   .roster-name button { width: 22px; height: 22px; border-radius: 6px; border: none; background: transparent; color: var(--text-muted); font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
   .roster-name button:hover { background: var(--red-light); color: var(--red); }
+  .roster-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .roster-role { padding: 5px 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px; font-weight: 700; cursor: pointer; outline: none; }
+  .roster-edit:hover { background: var(--surface2) !important; color: var(--accent) !important; }
 
   .emp-row-bottom {
     display: flex;
@@ -1020,6 +1023,7 @@ async function syncRosterFromScheduler() {
     if (!Array.isArray(employees)) return;
 
     const custom = JSON.parse(localStorage.getItem('customRoster') || '{}');
+    const removed = JSON.parse(localStorage.getItem('removedRoster') || '{}');
     let added = 0;
 
     employees.forEach(function(emp) {
@@ -1034,6 +1038,10 @@ async function syncRosterFromScheduler() {
         if (r) { role = r; break; }
       }
       if (!role) return; // no tipped position — skip
+
+      // Respect a manual role reassignment: if this name was moved OUT of this
+      // role in Manage Roster, don't let the scheduler re-add it here.
+      if (removed[role] && removed[role].some(function(n){ return (n||'').toLowerCase() === name.toLowerCase(); })) return;
 
       // Already in tipout's roster (case-insensitive match)? Skip.
       if (roster[role] && roster[role].some(function(n) {
@@ -1288,10 +1296,76 @@ function renderRoster() {
   ['Server', 'Bartender', 'Busser', 'Runner'].forEach(role => {
     html += `<div class="roster-role-title">${role}s</div>`;
     roster[role].forEach(name => {
-      html += `<div class="roster-name"><span>${name}</span><button onclick="removeFromRoster('${role}','${name.replace(/'/g, "\\'")}')">&times;</button></div>`;
+      const esc = name.replace(/'/g, "\\'");
+      const opts = ['Server', 'Bartender', 'Busser', 'Runner']
+        .map(r => `<option value="${r}" ${r === role ? 'selected' : ''}>${r}</option>`).join('');
+      html += `<div class="roster-name">
+        <span>${name}</span>
+        <div class="roster-actions">
+          <button title="Edit name" class="roster-edit" onclick="rosterRename('${role}','${esc}')">✎</button>
+          <select title="Change role" class="roster-role" onchange="rosterChangeRole('${role}','${esc}', this.value)">${opts}</select>
+          <button title="Remove" onclick="removeFromRoster('${role}','${esc}')">&times;</button>
+        </div>
+      </div>`;
     });
   });
   el.innerHTML = html;
+}
+
+// Move a roster name to a different role (e.g. Erin Burke Busser → Server) so she
+// shows in the right section going forward. Persists so it survives reloads + the
+// scheduler sync.
+function rosterChangeRole(oldRole, name, newRole) {
+  if (oldRole === newRole) return;
+  if (roster[oldRole]) roster[oldRole] = roster[oldRole].filter(n => n !== name);
+  if (!roster[newRole]) roster[newRole] = [];
+  if (!roster[newRole].includes(name)) roster[newRole].push(name);
+  roster[newRole].sort(sortByFirst);
+  try {
+    const removed = JSON.parse(localStorage.getItem('removedRoster') || '{}');
+    if (!removed[oldRole]) removed[oldRole] = [];
+    if (!removed[oldRole].includes(name)) removed[oldRole].push(name);
+    // un-remove from the new role in case it was previously removed there
+    if (removed[newRole]) removed[newRole] = removed[newRole].filter(n => n !== name);
+    localStorage.setItem('removedRoster', JSON.stringify(removed));
+  } catch (e) {}
+  try {
+    const custom = JSON.parse(localStorage.getItem('customRoster') || '{}');
+    if (custom[oldRole]) custom[oldRole] = custom[oldRole].filter(n => n !== name);
+    if (!custom[newRole]) custom[newRole] = [];
+    if (!custom[newRole].includes(name)) custom[newRole].push(name);
+    localStorage.setItem('customRoster', JSON.stringify(custom));
+  } catch (e) {}
+  renderRoster();
+  renderEmployees();
+  renderPartyEmployees();
+}
+
+// Rename a roster entry — fix a nickname to the person's full name (so the Google
+// Sheet sync matches their row). Persists across reloads.
+function rosterRename(role, oldName) {
+  const val = prompt('Edit name (use their full name so the sheet matches):', oldName);
+  if (val === null) return;
+  const newName = val.trim().replace(/\s+/g, ' ');
+  if (!newName || newName === oldName) return;
+  roster[role] = roster[role].map(n => n === oldName ? newName : n);
+  roster[role].sort(sortByFirst);
+  try {
+    const removed = JSON.parse(localStorage.getItem('removedRoster') || '{}');
+    if (!removed[role]) removed[role] = [];
+    if (!removed[role].includes(oldName)) removed[role].push(oldName);
+    localStorage.setItem('removedRoster', JSON.stringify(removed));
+  } catch (e) {}
+  try {
+    const custom = JSON.parse(localStorage.getItem('customRoster') || '{}');
+    if (custom[role]) custom[role] = custom[role].filter(n => n !== oldName);
+    if (!custom[role]) custom[role] = [];
+    if (!custom[role].includes(newName)) custom[role].push(newName);
+    localStorage.setItem('customRoster', JSON.stringify(custom));
+  } catch (e) {}
+  renderRoster();
+  renderEmployees();
+  renderPartyEmployees();
 }
 
 function removeFromRoster(role, name) {
