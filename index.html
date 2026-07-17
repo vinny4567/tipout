@@ -742,6 +742,14 @@
       <button class="add-emp-btn" onclick="addEmployee('Runner')">+ Add Runner</button>
     </div>
 
+    <div class="card" id="noBussersCard" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <div style="font-weight:700;color:var(--text);font-size:15px">Bussers Tonight</div>
+        <div id="noBussersStatus" style="font-size:12px;color:var(--text-dim);margin-top:2px"></div>
+      </div>
+      <button onclick="toggleNoBussers()" id="noBussersBtn" style="padding:10px 20px;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px"></button>
+    </div>
+
     <div class="card">
       <div class="card-title">Add New Employee to Roster</div>
       <div style="display:flex; gap:8px; align-items:center;">
@@ -1447,9 +1455,11 @@ function updateTakeHome() {
     if (!totalTips) { el.value = ''; return; }
     const runnerTipout = hasRunners ? Math.floor(totalTips / 100) * s.runnerPer100 : 0;
     const adjustedTotal = totalTips - runnerTipout;
-    const twentyPctTipout = (hasBartenders || hasBussers || s.busserPoolMode) ? Math.floor(adjustedTotal * s.tipoutPct * 100) / 100 : 0;
+    // "No Bussers Tonight" overrides both — nothing comes out for bussers
+    const busserActive = !s.noBussers && (hasBussers || s.busserPoolMode);
+    const twentyPctTipout = (hasBartenders || busserActive) ? Math.floor(adjustedTotal * s.tipoutPct * 100) / 100 : 0;
     const barTipout = hasBartenders ? Math.floor(twentyPctTipout * s.barShare * 100) / 100 : 0;
-    const busserTipout = (hasBussers || s.busserPoolMode) ? Math.floor(twentyPctTipout * s.busserShare * 100) / 100 : 0;
+    const busserTipout = busserActive ? Math.floor(twentyPctTipout * s.busserShare * 100) / 100 : 0;
     const remaining = Math.floor((totalTips - runnerTipout - barTipout - busserTipout) * 100) / 100;
     el.value = '$' + remaining.toFixed(2);
   });
@@ -1528,6 +1538,7 @@ function getSettings() {
     busserShare: (parseFloat(document.getElementById('busserShare').value) || 75) / 100,
     barShare: (parseFloat(document.getElementById('barShare').value) || 25) / 100,
     busserPoolMode: !!(document.getElementById('busserPoolMode') && document.getElementById('busserPoolMode').checked),
+    noBussers: noBussersTonight(),
     manager: document.getElementById('managerName').value || 'Manager',
     date: document.getElementById('reportDate').value,
   };
@@ -1565,6 +1576,44 @@ function applyBusserPoolMode() {
   if (banner) banner.style.display = on ? '' : 'none';
   try { updateBusserPoolBanner(); } catch (e) {}
   try { renderEmployees(); updateTakeHome(); } catch (e) {}
+}
+
+// ─── No Bussers Tonight ────────────────────────────────────────────
+// Per-night switch for nights nobody is bussing: the busser share is NOT
+// taken out of the servers' tips, and nothing goes into the pool. Stored as
+// the date it was set, so it clears itself as soon as a new day starts.
+function noBussersTonight() {
+  try { return localStorage.getItem('noBussersDate') === todayKey(); } catch (e) { return false; }
+}
+
+function toggleNoBussers() {
+  var on = !noBussersTonight();
+  try {
+    if (on) localStorage.setItem('noBussersDate', todayKey());
+    else localStorage.removeItem('noBussersDate');
+  } catch (e) {}
+  applyNoBussers();
+  try { renderEmployees(); updateTakeHome(); } catch (e) {}
+}
+
+function applyNoBussers() {
+  var on = noBussersTonight();
+  var card = document.getElementById('noBussersCard');
+  var btn = document.getElementById('noBussersBtn');
+  var status = document.getElementById('noBussersStatus');
+  if (card) card.style.borderColor = on ? 'var(--yellow)' : '';
+  if (btn) {
+    btn.textContent = on ? '✓ No Bussers Tonight — Tap to Undo' : '🚫 No Bussers Tonight';
+    btn.style.background = on ? 'var(--yellow)' : 'transparent';
+    btn.style.color = on ? '#1a1d27' : 'var(--text-dim)';
+    btn.style.border = '1px solid ' + (on ? 'var(--yellow)' : 'var(--border)');
+  }
+  if (status) {
+    status.textContent = on
+      ? 'Servers keep the busser share tonight — nothing goes into the pool.'
+      : 'Bussers working — the busser share comes out of server tips as usual.';
+    status.style.color = on ? 'var(--yellow)' : 'var(--text-dim)';
+  }
 }
 
 // Current 14-day pay period, anchored to Mar 23 2026 (matches the payroll cycle).
@@ -1641,13 +1690,15 @@ function calculate() {
     // Runner tipout only if runners are on shift
     const runnerTipout = hasRunners ? Math.floor(totalTips / 100) * s.runnerPer100 : 0;
     const adjustedTotal = totalTips - runnerTipout;
-    // 20% comes off if bartenders or bussers are on shift — or if Busser Pool Mode
-    // is on (the busser share is collected nightly even without bussers entered)
-    const twentyPctTipout = (hasBartenders || hasBussers || s.busserPoolMode) ? Math.floor(adjustedTotal * s.tipoutPct * 100) / 100 : 0;
+    // Bussers get their cut if on shift OR if Busser Pool Mode is on (pooled for
+    // payroll) — unless "No Bussers Tonight" is set, which overrides both: on a
+    // night nobody busses, the servers keep that money and the pool gets nothing.
+    const busserActive = !s.noBussers && (hasBussers || s.busserPoolMode);
+    // 20% comes off if bartenders are on shift, or if the busser share is live
+    const twentyPctTipout = (hasBartenders || busserActive) ? Math.floor(adjustedTotal * s.tipoutPct * 100) / 100 : 0;
     // Bar always gets their cut if bartenders are present
     const barTipout = hasBartenders ? Math.floor(twentyPctTipout * s.barShare * 100) / 100 : 0;
-    // Bussers get their cut if on shift OR if Busser Pool Mode is on (pooled for payroll)
-    const busserTipout = (hasBussers || s.busserPoolMode) ? Math.floor(twentyPctTipout * s.busserShare * 100) / 100 : 0;
+    const busserTipout = busserActive ? Math.floor(twentyPctTipout * s.busserShare * 100) / 100 : 0;
     // Servers keep: total - runner - bar tipout - busser tipout (if no bussers, that portion stays)
     const remaining = Math.floor((totalTips - runnerTipout - barTipout - busserTipout) * 100) / 100;
 
@@ -2706,6 +2757,7 @@ if ('serviceWorker' in navigator) {
 init();
 initParty();
 loadGoogleUrl();
+applyNoBussers();
 updatePendingCount();
 // Load the tipout log so the Busser Pool running total is accurate on open
 loadLogFromCloud().then(function () { try { updateBusserPoolBanner(); } catch (e) {} });
