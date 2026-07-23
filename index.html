@@ -750,6 +750,14 @@
       <button onclick="toggleNoBussers()" id="noBussersBtn" style="padding:10px 20px;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px"></button>
     </div>
 
+    <div class="card" id="noRunnersCard" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <div style="font-weight:700;color:var(--text);font-size:15px">Food Runners Tonight</div>
+        <div id="noRunnersStatus" style="font-size:12px;color:var(--text-dim);margin-top:2px"></div>
+      </div>
+      <button onclick="toggleNoRunners()" id="noRunnersBtn" style="padding:10px 20px;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px"></button>
+    </div>
+
     <div class="card">
       <div class="card-title">Add New Employee to Roster</div>
       <div style="display:flex; gap:8px; align-items:center;">
@@ -1452,7 +1460,8 @@ function updateTakeHome() {
     if (!el) return;
     const totalTips = srv.svcChg + srv.cash;
     if (!totalTips) { el.value = ''; return; }
-    const runnerTipout = hasRunners ? Math.floor(totalTips / 100) * s.runnerPer100 : 0;
+    const runnerActive = !s.noRunners && hasRunners;
+    const runnerTipout = runnerActive ? Math.floor(totalTips / 100) * s.runnerPer100 : 0;
     const adjustedTotal = totalTips - runnerTipout;
     // "No Bussers Tonight" overrides both — nothing comes out for bussers
     const busserActive = !s.noBussers && (hasBussers || s.busserPoolMode);
@@ -1538,6 +1547,7 @@ function getSettings() {
     barShare: (parseFloat(document.getElementById('barShare').value) || 25) / 100,
     busserPoolMode: !!(document.getElementById('busserPoolMode') && document.getElementById('busserPoolMode').checked),
     noBussers: noBussersTonight(),
+    noRunners: noRunnersTonight(),
     manager: document.getElementById('managerName').value || 'Manager',
     date: document.getElementById('reportDate').value,
   };
@@ -1615,6 +1625,44 @@ function applyNoBussers() {
   }
 }
 
+// ─── No Food Runners Tonight ────────────────────────────────────────
+// Per-night switch for nights with no food runner. Unlike bussers there's no
+// pool mode, so this forces the runner tipout to 0 even if runners are still
+// on the loaded roster — servers keep that cut. Self-expires with the date.
+function noRunnersTonight() {
+  try { return localStorage.getItem('noRunnersDate') === todayKey(); } catch (e) { return false; }
+}
+
+function toggleNoRunners() {
+  var on = !noRunnersTonight();
+  try {
+    if (on) localStorage.setItem('noRunnersDate', todayKey());
+    else localStorage.removeItem('noRunnersDate');
+  } catch (e) {}
+  applyNoRunners();
+  try { renderEmployees(); updateTakeHome(); } catch (e) {}
+}
+
+function applyNoRunners() {
+  var on = noRunnersTonight();
+  var card = document.getElementById('noRunnersCard');
+  var btn = document.getElementById('noRunnersBtn');
+  var status = document.getElementById('noRunnersStatus');
+  if (card) card.style.borderColor = on ? 'var(--yellow)' : '';
+  if (btn) {
+    btn.textContent = on ? '✓ No Food Runners Tonight — Tap to Undo' : '🚫 No Food Runners Tonight';
+    btn.style.background = on ? 'var(--yellow)' : 'transparent';
+    btn.style.color = on ? '#1a1d27' : 'var(--text-dim)';
+    btn.style.border = '1px solid ' + (on ? 'var(--yellow)' : 'var(--border)');
+  }
+  if (status) {
+    status.textContent = on
+      ? 'Servers keep the runner tipout tonight — no food runner cut comes out.'
+      : 'Food runners working — the runner tipout comes out of server tips as usual.';
+    status.style.color = on ? 'var(--yellow)' : 'var(--text-dim)';
+  }
+}
+
 // Current 14-day pay period, anchored to Mar 23 2026 (matches the payroll cycle).
 function currentPayPeriod() {
   var anchor = new Date(2026, 2, 23);           // Mar 23 2026
@@ -1686,8 +1734,10 @@ function calculate() {
   // Calculate server tipouts
   const serverResults = roles.Server.map(srv => {
     const totalTips = srv.svcChg + srv.cash;
-    // Runner tipout only if runners are on shift
-    const runnerTipout = hasRunners ? Math.floor(totalTips / 100) * s.runnerPer100 : 0;
+    // Runner tipout only if runners are on shift — unless "No Food Runners
+    // Tonight" is set, which zeroes it even with runners on the roster
+    const runnerActive = !s.noRunners && hasRunners;
+    const runnerTipout = runnerActive ? Math.floor(totalTips / 100) * s.runnerPer100 : 0;
     const adjustedTotal = totalTips - runnerTipout;
     // Bussers get their cut if on shift OR if Busser Pool Mode is on (pooled for
     // payroll) — unless "No Bussers Tonight" is set, which overrides both: on a
@@ -2757,6 +2807,7 @@ init();
 initParty();
 loadGoogleUrl();
 applyNoBussers();
+applyNoRunners();
 updatePendingCount();
 // Load the tipout log so the Busser Pool running total is accurate on open
 loadLogFromCloud().then(function () { try { updateBusserPoolBanner(); } catch (e) {} });
