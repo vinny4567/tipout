@@ -2695,7 +2695,27 @@ function syncToGoogleSheets() {
 }
 
 function sendToGoogle(url, payload, callback) {
-  // Encode data as URL parameter and load via script tag (bypasses all CORS)
+  // Apps Script answers with Access-Control-Allow-Origin: * (verified 8/5/2026), so a
+  // plain fetch can READ the reply. The old script-tag (JSONP) route always failed:
+  // the response is text/plain, the browser can't execute it, and onerror fired even
+  // though the row had already been written — "Sync failed" on data that saved fine.
+  try {
+    var encoded = encodeURIComponent(JSON.stringify(payload));
+    var src = url + '?data=' + encoded + '&key=vtip-9f3k-x82m-p47w&t=' + Date.now();
+    fetch(src, { method: 'GET', redirect: 'follow' })
+      .then(function(r) { return r.text().then(function(t) { return { ok: r.ok, t: t }; }); })
+      .then(function(res) {
+        if (res.ok) callback(true, 'sent');
+        else callback(false, navigator.onLine ? 'error' : 'offline');
+      })
+      .catch(function() { sendToGoogleJsonp(url, payload, callback); });   // fall back
+    return;
+  } catch (e) { /* fall through to the legacy path */ }
+  sendToGoogleJsonp(url, payload, callback);
+}
+
+function sendToGoogleJsonp(url, payload, callback) {
+  // Legacy fallback: load via script tag (used only if fetch itself is unavailable)
   try {
     var encoded = encodeURIComponent(JSON.stringify(payload));
     var script = document.createElement('script');
