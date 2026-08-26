@@ -832,9 +832,6 @@
     <div class="no-print" style="display:flex; gap:8px; margin-bottom:12px;">
       <button class="print-btn" onclick="window.print()">Print Report</button>
       <button class="btn" style="background:var(--green); color:#000; font-weight:600; padding:8px 16px; border:none; border-radius:8px; cursor:pointer;" onclick="saveToLog()">Save to Log</button>
-      <button class="btn" id="syncBtn" style="margin-left:24px; background:#4285f4; color:#fff; font-weight:600; padding:8px 16px; border:none; border-radius:8px; cursor:pointer;" onclick="syncToGoogleSheets()">
-        <span id="syncBtnText">Save to Google Sheets</span>
-      </button>
       <button class="btn" id="clearAllBtn" style="flex:0 0 auto; margin-left:24px; background:var(--red-light); color:var(--red); font-weight:700; padding:8px 16px; border:1px solid var(--red); border-radius:8px; cursor:pointer;" onclick="clearEverything()">
         <span id="clearAllBtnText">Clear All</span>
       </button>
@@ -2845,14 +2842,92 @@ loadGoogleUrl();
 applyNoBussers();
 applyNoRunners();
 updatePendingCount();
-// Load the tipout log so the Busser Pool running total is accurate on open
-loadLogFromCloud().then(function () { try { updateBusserPoolBanner(); } catch (e) {} });
+// Load the tipout log so the Busser Pool running total is accurate on open.
+// After it loads, run the catch-up: if yesterday has NO real (non-draft) entry
+// but HAS a draft, promote the draft to a real entry — covers the case where
+// the page wasn't open at midnight to auto-save.
+loadLogFromCloud().then(function () {
+  try { updateBusserPoolBanner(); } catch (e) {}
+  try { onLoadMidnightCatchup(); } catch (e) { console.error('onLoad catch-up', e); }
+});
 // Autosave failsafe: back up the in-progress night to the cloud on a timer and
 // whenever the app is backgrounded (iPad home button / tab switch).
 try {
   setInterval(function () { try { autosaveDraft(); } catch (e) {} }, 20000);
   document.addEventListener('visibilitychange', function () { if (document.hidden) { try { autosaveDraft(); } catch (e) {} } });
 } catch (e) {}
+// ── Midnight auto-save ────────────────────────────────────────────
+// If the page is open when the clock rolls past midnight, save the just-ended
+// day to the log automatically — but ONLY if nobody manually hit "Save to Log"
+// for that date. Catches nights where staff forgot. Interval polls once a
+// minute, so up to a 60s delay after midnight.
+var _mdyLastSeen = _mdyToday();
+function _mdyToday() {
+  var d = new Date();
+  return String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getDate()).padStart(2, '0') + '/' + d.getFullYear();
+}
+function _mdyYesterday() {
+  var d = new Date(); d.setDate(d.getDate() - 1);
+  return String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getDate()).padStart(2, '0') + '/' + d.getFullYear();
+}
+function _hasFinalEntryFor(dateMDY) {
+  return Array.isArray(tipoutLogCache) && tipoutLogCache.some(function (e) { return e && e.date === dateMDY && !e.draft; });
+}
+function _draftEntryFor(dateMDY) {
+  return Array.isArray(tipoutLogCache) ? tipoutLogCache.find(function (e) { return e && e.date === dateMDY && e.draft; }) : null;
+}
+// Persist an already-built entry to the cloud as a non-draft (silent — no alert).
+function _persistFinalEntry(entry) {
+  entry.id = 'La' + Date.now() + Math.random().toString(36).slice(2, 7);
+  entry.autoSaved = true;
+  return fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry), keepalive: true
+  }).then(function (r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    try { deleteDraftForDate(entry.date); } catch (e) {}
+    return loadLogFromCloud();
+  });
+}
+function _midnightSaveIfNeeded() {
+  var now = _mdyToday();
+  if (now === _mdyLastSeen) return;
+  var justEnded = _mdyLastSeen;
+  _mdyLastSeen = now;
+  if (_hasFinalEntryFor(justEnded)) return;                // already saved manually
+  var entry = null;
+  try { entry = buildLogEntry(false); } catch (e) { return; }
+  if (!entry) {
+    // No live data on screen — try promoting yesterday's draft instead
+    var d = _draftEntryFor(justEnded);
+    if (!d) return;
+    entry = JSON.parse(JSON.stringify(d));
+    delete entry.draft; delete entry.id;
+  }
+  entry.date = justEnded;
+  entry.savedAt = new Date().toISOString();
+  _persistFinalEntry(entry).then(function () {
+    try { renderLog(); } catch (e) {}
+    try { updateBusserPoolBanner(); } catch (e) {}
+  }).catch(function (e) { console.error('midnight auto-save', e); });
+}
+setInterval(function () { try { _midnightSaveIfNeeded(); } catch (e) {} }, 60000);
+
+// Fallback for when the page WASN'T open at midnight: on load, if yesterday
+// has no final entry but has an autosaved draft, promote the draft.
+function onLoadMidnightCatchup() {
+  var y = _mdyYesterday();
+  if (_hasFinalEntryFor(y)) return;                        // already saved
+  var d = _draftEntryFor(y);
+  if (!d) return;                                          // nothing to promote
+  var entry = JSON.parse(JSON.stringify(d));
+  delete entry.draft; delete entry.id;
+  entry.date = y;
+  entry.savedAt = new Date().toISOString();
+  _persistFinalEntry(entry).then(function () {
+    try { renderLog(); } catch (e) {}
+    try { updateBusserPoolBanner(); } catch (e) {}
+  }).catch(function (e) { console.error('catch-up auto-save', e); });
+}
 // Fire-and-forget: pull the scheduler's current employees and merge any new
 // names into the local roster. Purely additive — won't touch existing entries.
 syncRosterFromScheduler();
