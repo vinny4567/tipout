@@ -971,13 +971,35 @@ function persistEmployees() {
 // ─── Load Today's Schedule from Restaurant Scheduler ─────────────────────────
 const SCHEDULER_ROSTER_URL = 'https://restaurant-scheduler-hh5e.onrender.com/api/roster/today';
 const SCHEDULER_EMPLOYEES_URL = 'https://schedule.angeliscatering.com/api/roster/employees';
-const SCHEDULER_API_KEY = 'tipout-roster-key-vinny-7k9m2x4p';
+// NEVER hardcode the key here — this page is published publicly on GitHub Pages, so
+// anything in the source is readable by anyone with the URL. Pasted once per device.
+const SCHEDULER_API_KEY = () => localStorage.getItem('tipout_sched_key') || '';
+function setSchedulerKey() {
+  const k = prompt('Schedule key \u2014 needed to load and save the tip log.\n(ROSTER_API_KEY in Render \u2192 restaurant-scheduler)', SCHEDULER_API_KEY());
+  if (k === null) return;
+  k.trim() ? localStorage.setItem('tipout_sched_key', k.trim()) : localStorage.removeItem('tipout_sched_key');
+  location.reload();
+}
+// A missing key must be loud — silently showing an empty tip log is how a night's tips
+// get re-entered from scratch.
+window.addEventListener('DOMContentLoaded', function () {
+  if (SCHEDULER_API_KEY()) return;
+  const b = document.createElement('div');
+  b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#8c2f2f;color:#fff;padding:10px 14px;font:600 14px/1.4 system-ui;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap';
+  b.innerHTML = '<span>No schedule key on this device \u2014 the tip log can\'t load or save.</span>';
+  const btn = document.createElement('button');
+  btn.textContent = 'Enter key';
+  btn.style.cssText = 'background:#fff;color:#8c2f2f;border:0;border-radius:6px;padding:6px 14px;font-weight:700;cursor:pointer';
+  btn.onclick = setSchedulerKey;
+  b.appendChild(btn);
+  document.body.appendChild(b);
+});
 const TIPOUT_LOG_URL = 'https://restaurant-scheduler-hh5e.onrender.com/api/tipout-log';
 // Cloud copy of the saved-report log (so it's the same on every device, never wiped)
 let tipoutLogCache = null;
 async function loadLogFromCloud() {
   try {
-    const r = await fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY));
+    const r = await fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY()));
     if (r.ok) {
       const data = await r.json();
       tipoutLogCache = Array.isArray(data.log) ? data.log : [];
@@ -996,7 +1018,7 @@ async function migrateLocalLogToCloud() {
     if (!e.id) e.id = 'Lmig' + String(e.savedAt || e.date || i).replace(/[^a-zA-Z0-9]/g, '');
   });
   try {
-    const r = await fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY), {
+    const r = await fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY()), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ entries: local }),
@@ -1027,7 +1049,7 @@ function mapPositionToRole(pos) {
 async function syncRosterFromScheduler() {
   try {
     const response = await fetch(SCHEDULER_EMPLOYEES_URL, {
-      headers: { 'x-api-key': SCHEDULER_API_KEY }
+      headers: { 'x-api-key': SCHEDULER_API_KEY() }
     });
     if (!response.ok) {
       console.log('syncRosterFromScheduler: HTTP ' + response.status);
@@ -1107,7 +1129,7 @@ async function loadTodaysSchedule() {
   status.style.color = 'var(--text-dim)';
 
   try {
-    const res = await fetch(SCHEDULER_ROSTER_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY), { method: 'GET' });
+    const res = await fetch(SCHEDULER_ROSTER_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY()), { method: 'GET' });
     if (!res.ok) {
       const errText = await res.text();
       throw new Error('HTTP ' + res.status + ' — ' + errText.substring(0, 100));
@@ -2865,7 +2887,7 @@ function _draftEntryFor(dateMDY) {
 function _persistFinalEntry(entry) {
   entry.id = 'La' + Date.now() + Math.random().toString(36).slice(2, 7);
   entry.autoSaved = true;
-  return fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY), {
+  return fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY()), {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry), keepalive: true
   }).then(function (r) {
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -3172,7 +3194,7 @@ function saveToLog() {
 
   entry.id = 'L' + Date.now() + Math.random().toString(36).slice(2, 7);
   // Save to the cloud so the log is the same on every device
-  fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY), {
+  fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY()), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(entry),
@@ -3211,7 +3233,7 @@ function deleteDraftForDate(date) {
   if (!id) return;
   setDraftId(date, null);
   _lastDraftHash = '';
-  fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY) + '&id=' + encodeURIComponent(id), { method: 'DELETE' }).catch(function () {});
+  fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY()) + '&id=' + encodeURIComponent(id), { method: 'DELETE' }).catch(function () {});
 }
 function setBackupStatus(state) {
   var el = document.getElementById('backupStatus');
@@ -3235,7 +3257,7 @@ function autosaveDraft() {
   var newId = 'D' + Date.now() + Math.random().toString(36).slice(2, 6);
   entry.id = newId;
   setBackupStatus('saving');
-  fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY), {
+  fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY()), {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry)
   }).then(function (r) {
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -3245,7 +3267,7 @@ function autosaveDraft() {
     // Drop the previous draft for this night only AFTER the new one is saved,
     // so there's never a moment with no backup.
     if (oldId && oldId !== newId) {
-      fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY) + '&id=' + encodeURIComponent(oldId), { method: 'DELETE' }).catch(function () {});
+      fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY()) + '&id=' + encodeURIComponent(oldId), { method: 'DELETE' }).catch(function () {});
     }
     setBackupStatus('ok');
   }).catch(function () { setBackupStatus('error'); });
@@ -3273,7 +3295,7 @@ function flushOldDayBackup(oldEmployees, oldDateISO) {
     entry.id = 'D' + Date.now() + Math.random().toString(36).slice(2, 6);
     entry.autoBackup = true;
     setDraftId(oldDate, entry.id);
-    fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY), {
+    fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY()), {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry), keepalive: true
     }).catch(function () {});
   } catch (e) {}
@@ -3364,7 +3386,7 @@ function renderLog() {
 
 function deleteLogEntry(id) {
   if (!confirm('Delete this log entry?')) return;
-  fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY) + '&id=' + encodeURIComponent(id), { method: 'DELETE' })
+  fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY()) + '&id=' + encodeURIComponent(id), { method: 'DELETE' })
     .catch(function () {});
   tipoutLogCache = (tipoutLogCache || []).filter(function (e) { return e.id !== id; });
   renderLog();
@@ -3375,7 +3397,7 @@ async function clearLog() {
   var entries = (tipoutLogCache || []).slice();
   for (var i = 0; i < entries.length; i++) {
     try {
-      await fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY) + '&id=' + encodeURIComponent(entries[i].id), { method: 'DELETE' });
+      await fetch(TIPOUT_LOG_URL + '?key=' + encodeURIComponent(SCHEDULER_API_KEY()) + '&id=' + encodeURIComponent(entries[i].id), { method: 'DELETE' });
     } catch (e) {}
   }
   tipoutLogCache = [];
