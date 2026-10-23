@@ -971,7 +971,13 @@ function persistEmployees() {
 // ─── Load Today's Schedule from Restaurant Scheduler ─────────────────────────
 const SCHEDULER_ROSTER_URL = 'https://restaurant-scheduler-hh5e.onrender.com/api/roster/today';
 const SCHEDULER_EMPLOYEES_URL = 'https://schedule.angeliscatering.com/api/roster/employees';
-const SCHEDULER_API_KEY = 'tipout-roster-key-vinny-7k9m2x4p';
+// THIS REPO IS PUBLIC. The key used to be a literal here, which published it to anyone who viewed
+// source — that is how it leaked, and it stayed valid until the 10/22/2026 rotation killed it.
+// Hardcoding the NEW key would re-publish it within minutes of the push, so don't.
+// This app is served from vinny4567.github.io, the SAME ORIGIN as the Control Tower and the Watch
+// Tower, so it can simply read the key they already hold — nothing to paste, nothing to publish.
+// Same-origin iframes share localStorage, so this works embedded in the Control Tower's Tipout tab.
+const SCHEDULER_API_KEY = (function(){try{return localStorage.getItem('ct_sched_key')||''}catch(e){return ''}})();
 const TIPOUT_LOG_URL = 'https://restaurant-scheduler-hh5e.onrender.com/api/tipout-log';
 // Cloud copy of the saved-report log (so it's the same on every device, never wiped)
 let tipoutLogCache = null;
