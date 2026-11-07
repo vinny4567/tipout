@@ -114,6 +114,13 @@
      take focus — a total that can be hand-edited to disagree with its own two
      parts is the hole this sheet exists to close. */
   .bal-auto { background: transparent; border-style: dashed; color: var(--accent); cursor: default; }
+  .bal-diff { background: rgba(251, 191, 36, 0.06); }
+  .bal-verdict {
+    margin-top: 10px; padding: 12px 14px; border-radius: 8px; text-align: center;
+    font-size: 17px; font-weight: 800; letter-spacing: 0.2px;
+    background: var(--surface2); color: var(--text-dim); border: 1px solid var(--border);
+  }
+  .bal-verdict small { display: block; font-size: 12px; font-weight: 600; margin-top: 3px; opacity: 0.85; }
   .bal-out { font-size: 17px; font-weight: 800; color: var(--text); min-width: 108px; text-align: right; }
   /* The operator lines carry no number — they are the form's own arithmetic, kept
      so the sheet reads the same as the one he has filled in by hand for years. */
@@ -932,7 +939,10 @@
         <div class="bal-row bal-op"><div class="bal-label">Plus (+)</div><div class="bal-val"></div></div>
         <div class="bal-row"><div class="bal-label">Ending Dine Bank</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balEndDine" class="bal-input" oninput="balCalc()"></div></div>
         <div class="bal-row bal-eq"><div class="bal-label">Equals (=)</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" id="balEq4" class="bal-input bal-auto" readonly tabindex="-1" aria-readonly="true"></div></div>
+        <div class="bal-row bal-diff"><div class="bal-label">Over / Short <span class="bal-note">counted against what the night says</span></div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" id="balDiff" class="bal-input bal-auto" readonly tabindex="-1" aria-readonly="true"></div></div>
       </div>
+
+      <div id="balVerdict" class="bal-verdict">Fill the night in</div>
 
       <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
         <button class="btn" id="balClearBtn" onclick="balClear(event)" style="background:var(--surface2); color:var(--text);">Clear</button>
@@ -2167,7 +2177,47 @@ function balCalc() {
   balPut('balEq3', ['balStartBar','balStartDine','balCash','balTips','balPayout'], left);
   balPut('balEq4', ['balEndBar','balEndDine'], endBar + endDine);
 
+  // THE LINE THE PAPER DOES NOT PRINT — what is in the drawer against what the
+  // night says should be. Vinny writes it in the margin; on his 11/6 sheet it was
+  // 2,537.35 - 1,863.62 = 673.73. Needs every typed box, because it is the one
+  // figure nobody should read early.
+  const ALL = ['balStartBar','balStartDine','balCash','balTips','balPayout','balEndBar','balEndDine'];
+  const counted = endBar + endDine;
+  const diff = counted - left;
+  balPut('balDiff', ALL, diff);
+  balVerdict(ALL.every(balFilled), diff);
+
   balSave();
+}
+
+// ⚠️ OVER IS NOT GOOD NEWS. Short money is the obvious worry, but a drawer with
+// MORE in it than the night accounts for has not balanced either — a tip not paid
+// out, a payout never written down, a bank counted twice. Neither direction is
+// coloured like a pass, because "we were up" is how a discrepancy gets filed as a
+// good night and never looked at again.
+function balVerdict(ready, diff) {
+  const v = document.getElementById('balVerdict');
+  if (!v) return;
+  if (!ready) {
+    v.style.background = 'var(--surface2)'; v.style.borderColor = 'var(--border)';
+    v.style.color = 'var(--text-dim)';
+    v.textContent = 'Fill the night in';
+    return;
+  }
+  // Half a cent of float dust is not a discrepancy. Anything countable is.
+  if (Math.abs(diff) < 0.005) {
+    v.style.background = 'var(--green-light)'; v.style.borderColor = 'var(--green)';
+    v.style.color = 'var(--green)';
+    v.innerHTML = 'BALANCED<small>the drawer holds exactly what the night says it should</small>';
+  } else if (diff < 0) {
+    v.style.background = 'var(--red-light)'; v.style.borderColor = 'var(--red)';
+    v.style.color = 'var(--red)';
+    v.innerHTML = 'SHORT $' + balMoney(Math.abs(diff)) + '<small>less in the drawer than the night accounts for</small>';
+  } else {
+    v.style.background = 'var(--yellow-light)'; v.style.borderColor = 'var(--yellow)';
+    v.style.color = 'var(--yellow)';
+    v.innerHTML = 'OVER $' + balMoney(diff) + '<small>more in the drawer than the night accounts for — still does not balance</small>';
+  }
 }
 
 function balSave() {
