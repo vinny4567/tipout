@@ -921,17 +921,17 @@
         <div class="bal-row bal-eq"><div class="bal-label">Equals (=)</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" id="balEq1" class="bal-input bal-auto" readonly tabindex="-1" aria-readonly="true"></div></div>
 
         <div class="bal-row bal-op"><div class="bal-label">Plus (+)</div><div class="bal-val"></div></div>
-        <div class="bal-row"><div class="bal-label">Cash <span class="bal-note">every dollar taken in from customers tonight</span></div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balCash" class="bal-input" oninput="balSave()"></div></div>
-        <div class="bal-row bal-eq"><div class="bal-label">Equals (=)</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balEq2" class="bal-input" oninput="balSave()"></div></div>
+        <div class="bal-row"><div class="bal-label">Cash <span class="bal-note">every dollar taken in from customers tonight</span></div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balCash" class="bal-input" oninput="balCalc()"></div></div>
+        <div class="bal-row bal-eq"><div class="bal-label">Equals (=)</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" id="balEq2" class="bal-input bal-auto" readonly tabindex="-1" aria-readonly="true"></div></div>
 
-        <div class="bal-row"><div class="bal-label">Minus (&ndash;) tips paid</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balTips" class="bal-input" oninput="balSave()"></div></div>
-        <div class="bal-row"><div class="bal-label">Minus (&ndash;) payout</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balPayout" class="bal-input" oninput="balSave()"></div></div>
-        <div class="bal-row bal-eq"><div class="bal-label">Equals (=)</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balEq3" class="bal-input" oninput="balSave()"></div></div>
+        <div class="bal-row"><div class="bal-label">Minus (&ndash;) tips paid</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balTips" class="bal-input" oninput="balCalc()"></div></div>
+        <div class="bal-row"><div class="bal-label">Minus (&ndash;) payout</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balPayout" class="bal-input" oninput="balCalc()"></div></div>
+        <div class="bal-row bal-eq"><div class="bal-label">Equals (=)</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" id="balEq3" class="bal-input bal-auto" readonly tabindex="-1" aria-readonly="true"></div></div>
 
-        <div class="bal-row"><div class="bal-label">Ending Bar Bank</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balEndBar" class="bal-input" oninput="balSave()"></div></div>
+        <div class="bal-row"><div class="bal-label">Ending Bar Bank</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balEndBar" class="bal-input" oninput="balCalc()"></div></div>
         <div class="bal-row bal-op"><div class="bal-label">Plus (+)</div><div class="bal-val"></div></div>
-        <div class="bal-row"><div class="bal-label">Ending Dine Bank</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balEndDine" class="bal-input" oninput="balSave()"></div></div>
-        <div class="bal-row bal-eq"><div class="bal-label">Equals (=)</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balEq4" class="bal-input" oninput="balSave()"></div></div>
+        <div class="bal-row"><div class="bal-label">Ending Dine Bank</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balEndDine" class="bal-input" oninput="balCalc()"></div></div>
+        <div class="bal-row bal-eq"><div class="bal-label">Equals (=)</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" id="balEq4" class="bal-input bal-auto" readonly tabindex="-1" aria-readonly="true"></div></div>
       </div>
 
       <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
@@ -2108,21 +2108,33 @@ function switchTab(tab) {
 // ⚠️ HOSTS FILL THIS IN, NOT VINNY. So: nothing destructive without a second tap,
 // and whatever has been typed survives a reload — a drawer count interrupted by a
 // phone call or a screen lock must not start over.
+// Only what a host TYPES. The Equals rows are worked out from these every time
+// they are needed, so they are never stored — a remembered total could outlive the
+// numbers it came from and show a figure nothing on the sheet adds up to.
 const BAL_FIELDS = [
-  'balStartBar','balStartDine','balEq1',
-  'balCash','balEq2',
-  'balTips','balPayout','balEq3',
-  'balEndBar','balEndDine','balEq4'
+  'balStartBar','balStartDine',
+  'balCash',
+  'balTips','balPayout',
+  'balEndBar','balEndDine'
 ];
 const BAL_KEY = 'tipout_balance_v1';
 
 // Kept on this device only. Nothing leaves the iPad.
-// Starting Bar Bank + Starting Dine Bank. Filled only once BOTH are in: a running
-// total that appears while the second box is still empty reads as a finished figure,
-// and the one thing a host must never do is write down a half-counted drawer.
+// ─── THE FOUR WORKED-OUT LINES ───────────────────────────────────────────────
 //
-// Only this line is worked out so far — Vinny is walking the night through a row at
-// a time, and the rest stay typed until he says what they are.
+// ONE RULE, so a host only has to learn one: a line fills when EVERY box it
+// depends on has something in it, and stays blank until then. A typed 0 counts
+// as something; blank does not.
+//
+// ⚠️ WHICH MEANS A NIGHT WITH NO PAYOUTS NEEDS A TYPED 0. That is deliberate.
+// Treating an empty box as zero would make the total appear while the host is
+// still working down the page, and a figure that looks finished before the count
+// is finished is exactly what this sheet exists to prevent. Blank asks a
+// question; 0 answers it.
+//
+// Each line is computed from the TYPED numbers, never by reading the line above
+// it back out of the page — a total parsed from its own formatted text ("4,772.31")
+// is a second source for a number we already have.
 function balNum(id) {
   const el = document.getElementById(id);
   const n = parseFloat(String((el && el.value) || '').replace(/[^0-9.\-]/g, ''));
@@ -2135,13 +2147,26 @@ function balFilled(id) {
 function balMoney(n) {
   return (n < 0 ? '-' : '') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+function balPut(id, needs, value) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.value = needs.every(balFilled) ? balMoney(value) : '';
+}
 function balCalc() {
-  const out = document.getElementById('balEq1');
-  if (out) {
-    out.value = (balFilled('balStartBar') && balFilled('balStartDine'))
-      ? balMoney(balNum('balStartBar') + balNum('balStartDine'))
-      : '';
-  }
+  const startBar = balNum('balStartBar'), startDine = balNum('balStartDine');
+  const cash = balNum('balCash');
+  const tips = balNum('balTips'), payout = balNum('balPayout');
+  const endBar = balNum('balEndBar'), endDine = balNum('balEndDine');
+
+  const start    = startBar + startDine;          // the two banks the night opened with
+  const withCash = start + cash;                  // plus every dollar taken from customers
+  const left     = withCash - tips - payout;      // less what went back out
+
+  balPut('balEq1', ['balStartBar','balStartDine'], start);
+  balPut('balEq2', ['balStartBar','balStartDine','balCash'], withCash);
+  balPut('balEq3', ['balStartBar','balStartDine','balCash','balTips','balPayout'], left);
+  balPut('balEq4', ['balEndBar','balEndDine'], endBar + endDine);
+
   balSave();
 }
 
