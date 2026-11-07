@@ -905,30 +905,33 @@
         </div>
       </div>
 
+      <!-- The form, row for row. Every line that carries a figure on the paper
+           carries a box here — the "Equals" lines included, because those are
+           written in by hand too. The "Plus (+)" lines are blank on the paper and
+           blank here. Nothing is computed yet: Vinny is walking me through how the
+           night actually works before any arithmetic goes in. -->
       <div class="bal-sheet">
-        <div class="bal-row"><div class="bal-label">Starting Bar Bank</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balStartBar" class="bal-input" placeholder="0.00" oninput="balCalc()"></div></div>
+        <div class="bal-row"><div class="bal-label">Starting Bar Bank</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balStartBar" class="bal-input" oninput="balSave()"></div></div>
         <div class="bal-row bal-op"><div class="bal-label">Plus (+)</div><div class="bal-val"></div></div>
-        <div class="bal-row"><div class="bal-label">Starting Dine Bank</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balStartDine" class="bal-input" placeholder="0.00" oninput="balCalc()"></div></div>
-        <div class="bal-row bal-eq"><div class="bal-label">Equals (=)</div><div class="bal-val"><span class="bal-dollar">$</span><span id="balStartTotal" class="bal-out">0.00</span></div></div>
+        <div class="bal-row"><div class="bal-label">Starting Dine Bank</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balStartDine" class="bal-input" oninput="balSave()"></div></div>
+        <div class="bal-row bal-eq"><div class="bal-label">Equals (=)</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balEq1" class="bal-input" oninput="balSave()"></div></div>
 
         <div class="bal-row bal-op"><div class="bal-label">Plus (+)</div><div class="bal-val"></div></div>
-        <div class="bal-row"><div class="bal-label">Cash <span class="bal-note">(listed on bottom of report above &ndash; tips paid)</span></div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balCash" class="bal-input" placeholder="0.00" oninput="balCalc()"></div></div>
-        <div class="bal-row bal-eq"><div class="bal-label">Equals (=)</div><div class="bal-val"><span class="bal-dollar">$</span><span id="balAfterCash" class="bal-out">0.00</span></div></div>
+        <div class="bal-row"><div class="bal-label">Cash <span class="bal-note">(listed on bottom of report above &ndash; tips paid)</span></div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balCash" class="bal-input" oninput="balSave()"></div></div>
+        <div class="bal-row bal-eq"><div class="bal-label">Equals (=)</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balEq2" class="bal-input" oninput="balSave()"></div></div>
 
-        <div class="bal-row"><div class="bal-label">Minus (&ndash;) tips paid</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balTips" class="bal-input" placeholder="0.00" oninput="balCalc()"></div></div>
-        <div class="bal-row"><div class="bal-label">Minus (&ndash;) payout</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balPayout" class="bal-input" placeholder="0.00" oninput="balCalc()"></div></div>
-        <div class="bal-row bal-eq"><div class="bal-label">Equals (=) <span class="bal-note">should be in the drawer</span></div><div class="bal-val"><span class="bal-dollar">$</span><span id="balExpected" class="bal-out">0.00</span></div></div>
+        <div class="bal-row"><div class="bal-label">Minus (&ndash;) tips paid</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balTips" class="bal-input" oninput="balSave()"></div></div>
+        <div class="bal-row"><div class="bal-label">Minus (&ndash;) payout</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balPayout" class="bal-input" oninput="balSave()"></div></div>
+        <div class="bal-row bal-eq"><div class="bal-label">Equals (=)</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balEq3" class="bal-input" oninput="balSave()"></div></div>
 
-        <div class="bal-row"><div class="bal-label">Ending Bar Bank</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balEndBar" class="bal-input" placeholder="0.00" oninput="balCalc()"></div></div>
+        <div class="bal-row"><div class="bal-label">Ending Bar Bank</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balEndBar" class="bal-input" oninput="balSave()"></div></div>
         <div class="bal-row bal-op"><div class="bal-label">Plus (+)</div><div class="bal-val"></div></div>
-        <div class="bal-row"><div class="bal-label">Ending Dine Bank</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balEndDine" class="bal-input" placeholder="0.00" oninput="balCalc()"></div></div>
-        <div class="bal-row bal-eq"><div class="bal-label">Equals (=) <span class="bal-note">actually counted</span></div><div class="bal-val"><span class="bal-dollar">$</span><span id="balActual" class="bal-out">0.00</span></div></div>
+        <div class="bal-row"><div class="bal-label">Ending Dine Bank</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balEndDine" class="bal-input" oninput="balSave()"></div></div>
+        <div class="bal-row bal-eq"><div class="bal-label">Equals (=)</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balEq4" class="bal-input" oninput="balSave()"></div></div>
       </div>
 
-      <div id="balVerdict" class="bal-verdict">Enter the night's numbers</div>
-
       <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
-        <button class="btn" onclick="balClear()" style="background:var(--surface2); color:var(--text);">Clear</button>
+        <button class="btn" id="balClearBtn" onclick="balClear(event)" style="background:var(--surface2); color:var(--text);">Clear</button>
         <button class="btn" onclick="window.print()" style="background:var(--surface2); color:var(--text);">Print</button>
       </div>
     </div>
@@ -2093,75 +2096,23 @@ function switchTab(tab) {
 
 // ─── BALANCE: the nightly close ──────────────────────────────────────────────
 //
-// The arithmetic is the paper form's, in the paper form's order:
-//   starting bar + starting dine            = what the night opened with
-//   + cash taken in                         = everything that passed through
-//   - tips paid - payouts                   = what SHOULD be in the drawer
-//   ending bar + ending dine                = what IS in the drawer
-//   the difference                          = the reason the sheet exists
+// Laid out row for row like the sheet in the binder. NOTHING IS CALCULATED YET —
+// Vinny is walking me through how the night actually works before any arithmetic
+// goes in, and a formula guessed from one photograph is a formula that is wrong
+// on the nights that matter. Every figure is typed, exactly as it is in pen today.
 //
-// ⚠️ OVER IS NOT GOOD NEWS. Short money is the obvious worry, but a drawer
-// holding MORE than it should means the night did not add up either — a tip
-// not paid out, a payout not recorded, a bank counted twice. The sheet Vinny
-// photographed was $673.73 OVER. So anything that is not zero gets flagged,
-// and neither direction is coloured like a pass.
-const BAL_FIELDS = ['balStartBar','balStartDine','balCash','balTips','balPayout','balEndBar','balEndDine'];
+// ⚠️ HOSTS FILL THIS IN, NOT VINNY. So: nothing destructive without a second tap,
+// and whatever has been typed survives a reload — a drawer count interrupted by a
+// phone call or a screen lock must not start over.
+const BAL_FIELDS = [
+  'balStartBar','balStartDine','balEq1',
+  'balCash','balEq2',
+  'balTips','balPayout','balEq3',
+  'balEndBar','balEndDine','balEq4'
+];
 const BAL_KEY = 'tipout_balance_v1';
 
-// "1,234.56", "$1234.56", "1234" → 1234.56. Anything unreadable is 0, never NaN:
-// a NaN would propagate through every total and show the manager nothing at all.
-function balNum(id) {
-  const el = document.getElementById(id);
-  const n = parseFloat(String(el && el.value || '').replace(/[^0-9.\-]/g, ''));
-  return isFinite(n) ? n : 0;
-}
-function balMoney(n) {
-  return (n < 0 ? '-' : '') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function balCalc() {
-  const startTotal = balNum('balStartBar') + balNum('balStartDine');
-  const afterCash  = startTotal + balNum('balCash');
-  const expected   = afterCash - balNum('balTips') - balNum('balPayout');
-  const actual     = balNum('balEndBar') + balNum('balEndDine');
-
-  document.getElementById('balStartTotal').textContent = balMoney(startTotal);
-  document.getElementById('balAfterCash').textContent  = balMoney(afterCash);
-  document.getElementById('balExpected').textContent   = balMoney(expected);
-  document.getElementById('balActual').textContent     = balMoney(actual);
-
-  const v = document.getElementById('balVerdict');
-  const anyEntered = BAL_FIELDS.some(id => String((document.getElementById(id) || {}).value || '').trim() !== '');
-  if (!anyEntered) {
-    v.style.background = 'var(--surface2)'; v.style.borderColor = 'var(--border)';
-    v.style.color = 'var(--text-dim)';
-    v.textContent = "Enter the night's numbers";
-    balSave(); return;
-  }
-
-  const diff = actual - expected;
-  // Half a cent of float dust is not a discrepancy. Anything a person could
-  // actually count is.
-  if (Math.abs(diff) < 0.005) {
-    v.style.background = 'var(--green-light)'; v.style.borderColor = 'var(--green)';
-    v.style.color = 'var(--green)';
-    v.innerHTML = 'BALANCED<small>the drawer holds exactly what it should</small>';
-  } else if (diff < 0) {
-    v.style.background = 'var(--red-light)'; v.style.borderColor = 'var(--red)';
-    v.style.color = 'var(--red)';
-    v.innerHTML = 'SHORT $' + balMoney(Math.abs(diff)) +
-      '<small>the drawer is missing this much against the report</small>';
-  } else {
-    v.style.background = 'var(--yellow-light)'; v.style.borderColor = 'var(--yellow)';
-    v.style.color = 'var(--yellow)';
-    v.innerHTML = 'OVER $' + balMoney(diff) +
-      '<small>more in the drawer than the night accounts for — still does not balance</small>';
-  }
-  balSave();
-}
-
-// Kept on this device only, so a half-finished count survives a reload or the
-// screen locking mid-drawer. Nothing leaves the iPad.
+// Kept on this device only. Nothing leaves the iPad.
 function balSave() {
   try {
     const o = { date: (document.getElementById('balDate') || {}).value || '' };
@@ -2177,7 +2128,7 @@ function balDayName() {
   if (!el.value) { out.textContent = ''; return; }
   // Parsed as local parts, NOT new Date('2026-11-06') — that is read as UTC and
   // lands on the previous evening in Illinois, so a Friday close would read
-  // "Thursday" on the one line a manager uses to find the right sheet.
+  // "Thursday" on the one line a host uses to find the right sheet.
   const p = el.value.split('-').map(Number);
   const d = new Date(p[0], p[1] - 1, p[2]);
   out.textContent = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()] || '';
@@ -2200,12 +2151,29 @@ function balLoad() {
     });
   } catch (e) {}
   balDayName();
-  balCalc();
 }
 
-function balClear() {
+// Two taps, same pattern as the Save buttons. A host who means to start a fresh
+// night and a host whose thumb found the wrong button look identical to the app;
+// the difference is whether they tap again.
+let balClearArmed = false, balClearTimer = null;
+function balClear(ev) {
+  const btn = (ev && ev.target) || document.getElementById('balClearBtn');
+  if (!balClearArmed) {
+    balClearArmed = true;
+    if (btn) { btn.dataset.label = btn.textContent; btn.textContent = 'Tap again to clear'; btn.style.color = 'var(--red)'; }
+    clearTimeout(balClearTimer);
+    balClearTimer = setTimeout(() => {
+      balClearArmed = false;
+      if (btn && btn.dataset.label) { btn.textContent = btn.dataset.label; btn.style.color = ''; }
+    }, 3000);
+    return;
+  }
+  clearTimeout(balClearTimer);
+  balClearArmed = false;
+  if (btn && btn.dataset.label) { btn.textContent = btn.dataset.label; btn.style.color = ''; }
   BAL_FIELDS.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-  balCalc();
+  balSave();
 }
 
 function clearAll() {
