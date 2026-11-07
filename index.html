@@ -911,10 +911,15 @@
       <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
         <div class="card-title" style="margin:0;">Nightly Balance</div>
         <div style="display:flex; gap:8px; align-items:center;">
-          <input type="date" id="balDate" class="setting-input" style="width:auto; padding:8px 10px; font-size:15px;" onchange="balSave()">
+          <input type="date" id="balDate" class="setting-input" style="width:auto; padding:8px 10px; font-size:15px;" onchange="balSwitchDate()">
           <span id="balDay" style="font-size:14px; font-weight:700; color:var(--text-dim); min-width:72px;"></span>
         </div>
       </div>
+
+      <!-- A sheet dated differently from the rest of the night does not get saved
+           with that night's log entry. Say so HERE, where it can still be fixed,
+           instead of letting the log quietly come up empty later. -->
+      <div id="balDateWarn" style="display:none; margin-bottom:10px; padding:9px 12px; border-radius:8px; font-size:13px; font-weight:600; background:var(--yellow-light); color:var(--yellow); border:1px solid var(--yellow);"></div>
 
       <!-- The form, row for row. Every line that carries a figure on the paper
            carries a box here — the "Equals" lines included, because those are
@@ -940,6 +945,13 @@
         <div class="bal-row"><div class="bal-label">Ending Dine Bank</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balEndDine" class="bal-input" oninput="balCalc()"></div></div>
         <div class="bal-row bal-eq"><div class="bal-label">Equals (=)</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" id="balEq4" class="bal-input bal-auto" readonly tabindex="-1" aria-readonly="true"></div></div>
         <div class="bal-row bal-diff"><div class="bal-label">Over / Short <span class="bal-note">counted against what the night says</span></div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" id="balDiff" class="bal-input bal-auto" readonly tabindex="-1" aria-readonly="true"></div></div>
+
+        <!-- THE CHECK. The left-over cash is not a mystery — it is the tip-out
+             the servers handed in and nobody has been paid out of yet. So the
+             Over / Short above has to come out at the three pools, to the cent.
+             Read live off the Employees tab, never re-typed. -->
+        <div class="bal-row bal-op"><div class="bal-label">Must equal (=)</div><div class="bal-val"></div></div>
+        <div class="bal-row bal-diff"><div class="bal-label">Tip-out owed <span class="bal-note" id="balPoolNote">busser + bar + runner, from the Employees tab</span></div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" id="balPoolTotal" class="bal-input bal-auto" readonly tabindex="-1" aria-readonly="true"></div></div>
       </div>
 
       <div id="balVerdict" class="bal-verdict">Fill the night in</div>
@@ -2155,6 +2167,11 @@ function balFilled(id) {
   return String((el && el.value) || '').trim() !== '';
 }
 function balMoney(n) {
+  // ⚠️ Adding and subtracting dollars in binary leaves dust: a night that comes
+  // out exactly even lands on -0.0000000001, and the minus sign survives the
+  // rounding. It printed "-$0.00" on a balanced drawer. Anything under half a
+  // cent is zero, and zero has no sign.
+  if (!isFinite(n) || Math.abs(n) < 0.005) n = 0;
   return (n < 0 ? '-' : '') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 function balPut(id, needs, value) {
@@ -2185,9 +2202,67 @@ function balCalc() {
   const counted = endBar + endDine;
   const diff = counted - left;
   balPut('balDiff', ALL, diff);
-  balVerdict(ALL.every(balFilled), diff);
 
+  // ─── THE CHECK ─────────────────────────────────────────────────────────────
+  // The left-over cash is not loose money: it is the tip-out the servers handed
+  // in, still sitting in the drawer because nobody has been paid out of it yet.
+  // So Over / Short must come out at the three pools exactly. If it does, every
+  // dollar of the night is accounted for twice over — once by the register and
+  // once by the count.
+  const pools = balPoolsNow();
+  const poolEl = document.getElementById('balPoolTotal');
+  const noteEl = document.getElementById('balPoolNote');
+  if (poolEl) poolEl.value = pools ? balMoney(pools.total) : '';
+  if (noteEl) {
+    noteEl.textContent = pools
+      ? 'busser ' + balMoney(pools.busser) + '  +  bar ' + balMoney(pools.bar) + '  +  runner ' + balMoney(pools.runner)
+      : 'nothing on the Employees tab yet — nothing to check against';
+  }
+
+  balVerdict(ALL.every(balFilled), diff, pools);
+  balDateWarn();
   balSave();
+}
+
+// The other half of the check, taken live from the Employees tab — the same
+// three pools the Report prints and the Log stores.
+//
+// ⚠️ NEVER a second box for a host to copy the figure into. A re-keyed number is
+// a copy, and the night a copy drifts from the original is the night this sheet
+// agrees with itself and disagrees with the money.
+//
+// Returns NULL, not zeroes, when the tip-out has not been entered. That matters:
+// zeroes against a blank balance sheet would add up and show BALANCED, which is
+// the one thing a check like this must never do — an unrun check is not a pass.
+function balPoolsNow() {
+  try {
+    const any = employees.some(e => e.name && (e.svcChg > 0 || e.cash > 0 || e.hours > 0));
+    if (!any) return null;
+    const d = calculate();
+    const busser = d.busserPool || 0, bar = d.barPool || 0, runner = d.runnerPool || 0;
+    return { busser: busser, bar: bar, runner: runner, total: busser + bar + runner };
+  } catch (e) {
+    return null;   // a broken tip-out sheet must not take the balance sheet down with it
+  }
+}
+
+// MM/DD/YYYY, to line this sheet up with a log entry's date.
+function balDateMMDDYYYY() {
+  const p = String((document.getElementById('balDate') || {}).value || '').split('-');
+  return p.length === 3 ? p[1] + '/' + p[2] + '/' + p[0] : '';
+}
+
+function balDateWarn() {
+  const w = document.getElementById('balDateWarn');
+  const rd = document.getElementById('reportDate');
+  if (!w) return;
+  const mine = String((document.getElementById('balDate') || {}).value || '');
+  const theirs = String((rd && rd.value) || '');
+  if (!mine || !theirs || mine === theirs) { w.style.display = 'none'; return; }
+  w.style.display = '';
+  w.textContent = 'This balance sheet is dated ' + balDateMMDDYYYY() +
+    ', but the rest of the night is dated ' + theirs.split('-').slice(1).join('/') + '/' + theirs.split('-')[0] +
+    '. Fix one of them, or this sheet will not be saved with tonight\'s log entry.';
 }
 
 // ⚠️ OVER IS NOT GOOD NEWS. Short money is the obvious worry, but a drawer with
@@ -2195,38 +2270,108 @@ function balCalc() {
 // out, a payout never written down, a bank counted twice. Neither direction is
 // coloured like a pass, because "we were up" is how a discrepancy gets filed as a
 // good night and never looked at again.
-function balVerdict(ready, diff) {
+function balVerdict(ready, diff, pools) {
   const v = document.getElementById('balVerdict');
   if (!v) return;
+  const grey  = () => { v.style.background = 'var(--surface2)';   v.style.borderColor = 'var(--border)'; v.style.color = 'var(--text-dim)'; };
+  const green = () => { v.style.background = 'var(--green-light)';v.style.borderColor = 'var(--green)';  v.style.color = 'var(--green)'; };
+  const red   = () => { v.style.background = 'var(--red-light)';  v.style.borderColor = 'var(--red)';    v.style.color = 'var(--red)'; };
+  const amber = () => { v.style.background = 'var(--yellow-light)';v.style.borderColor = 'var(--yellow)';v.style.color = 'var(--yellow)'; };
+
   if (!ready) {
-    v.style.background = 'var(--surface2)'; v.style.borderColor = 'var(--border)';
-    v.style.color = 'var(--text-dim)';
+    grey();
     v.textContent = 'Fill the night in';
     return;
   }
-  // Half a cent of float dust is not a discrepancy. Anything countable is.
-  if (Math.abs(diff) < 0.005) {
-    v.style.background = 'var(--green-light)'; v.style.borderColor = 'var(--green)';
-    v.style.color = 'var(--green)';
-    v.innerHTML = 'BALANCED<small>the drawer holds exactly what the night says it should</small>';
-  } else if (diff < 0) {
-    v.style.background = 'var(--red-light)'; v.style.borderColor = 'var(--red)';
-    v.style.color = 'var(--red)';
-    v.innerHTML = 'SHORT $' + balMoney(Math.abs(diff)) + '<small>less in the drawer than the night accounts for</small>';
-  } else {
-    v.style.background = 'var(--yellow-light)'; v.style.borderColor = 'var(--yellow)';
-    v.style.color = 'var(--yellow)';
-    v.innerHTML = 'OVER $' + balMoney(diff) + '<small>more in the drawer than the night accounts for — still does not balance</small>';
+  // ⚠️ NO TIP-OUT ENTERED = NO VERDICT. Not green, not red. The count is done but
+  // the thing it is checked against is missing, and a check that could not run
+  // must never look like a check that passed.
+  if (!pools) {
+    grey();
+    v.innerHTML = 'OVER / SHORT $' + balMoney(diff) +
+      '<small>not checked yet — the Employees tab is empty, so there is no tip-out to compare this to</small>';
+    return;
   }
+
+  const gap = diff - pools.total;
+
+  // Half a cent of float dust is not a discrepancy. Anything countable is.
+  if (Math.abs(gap) < 0.005) {
+    green();
+    v.innerHTML = 'BALANCED<small>the $' + balMoney(diff) + ' left in the drawer is exactly the tip-out owed</small>';
+  } else if (gap < 0) {
+    red();
+    v.innerHTML = 'SHORT $' + balMoney(Math.abs(gap)) +
+      '<small>$' + balMoney(diff) + ' in the drawer against $' + balMoney(pools.total) + ' of tip-out owed</small>';
+  } else {
+    // Over is not good news either — a tip not paid out, a payout never written
+    // down, a bank counted twice. "We were up" is how a discrepancy gets filed as
+    // a good night and never looked at again, so it is not coloured like a pass.
+    amber();
+    v.innerHTML = 'OVER $' + balMoney(gap) +
+      '<small>$' + balMoney(diff) + ' in the drawer against $' + balMoney(pools.total) + ' of tip-out owed</small>';
+  }
+}
+
+// ─── ONE SHEET PER NIGHT ─────────────────────────────────────────────────────
+//
+// Stored by date, not as a single rolling sheet. The first version kept one, and
+// the next night it opened holding LAST night's count under tonight's heading —
+// numbers that look filled in and are not, which is worse than an empty page.
+// Keyed by date, a new night starts blank on its own and an old night stays
+// readable instead of being overwritten.
+function balStore() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(BAL_KEY) || '{}');
+    if (raw && raw.sheets) return { sheets: raw.sheets };
+    // The older shape held one sheet at the top level. Fold it in under its own
+    // date rather than dropping it — a host mid-count when this ships keeps it.
+    const sheets = {};
+    if (raw && raw.date) {
+      const s = {};
+      BAL_FIELDS.forEach(id => { s[id] = raw[id] || ''; });
+      sheets[raw.date] = s;
+    }
+    return { sheets: sheets };
+  } catch (e) { return { sheets: {} }; }
 }
 
 function balSave() {
   try {
-    const o = { date: (document.getElementById('balDate') || {}).value || '' };
-    BAL_FIELDS.forEach(id => { o[id] = (document.getElementById(id) || {}).value || ''; });
-    localStorage.setItem(BAL_KEY, JSON.stringify(o));
+    const date = (document.getElementById('balDate') || {}).value || '';
+    if (date) {
+      const store = balStore();
+      const s = {};
+      BAL_FIELDS.forEach(id => { s[id] = (document.getElementById(id) || {}).value || ''; });
+      store.sheets[date] = s;
+      // Keep roughly four months of nights; drop the oldest beyond that so this
+      // can't grow without limit on a device that never gets cleared.
+      const dates = Object.keys(store.sheets).sort();
+      while (dates.length > 120) delete store.sheets[dates.shift()];
+      localStorage.setItem(BAL_KEY, JSON.stringify({ sheets: store.sheets }));
+    }
   } catch (e) {}
   balDayName();
+}
+
+// The date the host picked by hand this session, so flipping back to an older
+// night to read it doesn't get yanked to today on the next tab switch. Not
+// persisted: after a reload the sheet follows the night the app is on.
+let balPickedDate = null;
+
+function balSwitchDate() {
+  balPickedDate = (document.getElementById('balDate') || {}).value || null;
+  balFillFromStore();
+  balCalc();
+}
+
+function balFillFromStore() {
+  const date = (document.getElementById('balDate') || {}).value || '';
+  const s = (balStore().sheets || {})[date] || {};
+  BAL_FIELDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = s[id] || '';
+  });
 }
 
 function balDayName() {
@@ -2243,19 +2388,20 @@ function balDayName() {
 
 function balLoad() {
   try {
-    const o = JSON.parse(localStorage.getItem(BAL_KEY) || '{}');
     const d = document.getElementById('balDate');
     if (d) {
-      if (o.date) d.value = o.date;
+      // Follow the night the rest of the app is on, so the sheet lands on the same
+      // date as the tip-out it gets checked against and saved with. A date the host
+      // picked by hand this session wins; today is only the last resort.
+      const rd = (document.getElementById('reportDate') || {}).value || '';
+      if (balPickedDate) d.value = balPickedDate;
+      else if (rd) d.value = rd;
       else {
         const n = new Date();
         d.value = n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
       }
     }
-    BAL_FIELDS.forEach(id => {
-      const el = document.getElementById(id);
-      if (el && o[id] != null) el.value = o[id];
-    });
+    balFillFromStore();
   } catch (e) {}
   balDayName();
   balCalc();
@@ -3409,6 +3555,32 @@ function syncDirectTipsToGoogleSheets() {
 }
 
 // --- Tip-Out Log ---
+// The balance sheet, frozen for the log. Returns null — never a half-filled
+// object — when there isn't one to save:
+//
+//   • a sheet dated differently from the night being saved belongs to a
+//     DIFFERENT night, and attaching it would put one night's count under
+//     another night's heading;
+//   • a half-finished count is not a balance, and stored as one it would read
+//     like a finished night that happened to be short.
+//
+// Raw numbers only. The totals get worked out again at render time from these,
+// so a stored total can never outlive the figures it came from.
+function balLogSnapshot(dateStr) {
+  try {
+    if (balDateMMDDYYYY() !== dateStr) return null;
+    if (!BAL_FIELDS.every(balFilled)) return null;
+    var b = {};
+    BAL_FIELDS.forEach(function (id) { b[id] = balNum(id); });
+    return {
+      startBar: b.balStartBar, startDine: b.balStartDine,
+      cash: b.balCash,
+      tips: b.balTips, payout: b.balPayout,
+      endBar: b.balEndBar, endDine: b.balEndDine
+    };
+  } catch (e) { return null; }
+}
+
 // Build the log entry for the current night (server/bar/busser/runner/party/
 // direct + pools). Returns null when there's nothing entered. Shared by the
 // manual "Save to Log" and the autosave failsafe (isDraft=true tags it).
@@ -3419,10 +3591,14 @@ function buildLogEntry(isDraft) {
   var partyTipVal = parseFloat((document.getElementById('partyTip')||{}).value) || 0;
   var hasPartyData = partyTipVal > 0 && Array.isArray(partyEmps) && partyEmps.some(function(e) { return e.name; });
   var hasDirectData = (directTips || []).length > 0;
-  if (!hasEmpData && !hasPartyData && !hasDirectData) return null;
 
   var d = s.date ? new Date(s.date + 'T12:00:00') : new Date();
   var dateStr = (d.getMonth()+1).toString().padStart(2,'0') + '/' + d.getDate().toString().padStart(2,'0') + '/' + d.getFullYear();
+
+  // A finished balance sheet is a night's worth of work on its own — if a host
+  // counted the drawer, that gets saved even when nothing else was entered yet.
+  var balSnap = balLogSnapshot(dateStr);
+  if (!hasEmpData && !hasPartyData && !hasDirectData && !balSnap) return null;
 
   var entry = { date: dateStr, savedAt: new Date().toISOString(), servers: [], bartenders: [], bussers: [], runners: [], pools: {}, party: [], partyTotal: 0, direct: [] };
 
@@ -3439,6 +3615,10 @@ function buildLogEntry(isDraft) {
     if (r.name) entry.runners.push({ name: r.name, tipReceived: r.tipReceived });
   });
   entry.pools = { runner: data.runnerPool, bar: data.barPool, busser: data.busserPool };
+  // Vinny: "every night i want the balance sheet at the bottom of this log."
+  // null when there isn't one — the log says so out loud rather than the section
+  // silently not appearing, because a night nobody counted is worth seeing.
+  entry.balance = balSnap;
 
   if (hasPartyData) {
     entry.partyTotal = partyTipVal;
@@ -3644,10 +3824,56 @@ function renderLog() {
     html += '<div class="log-row"><span class="log-row-name">Bar Pool</span><span style="color:var(--text-dim);">$' + entry.pools.bar.toFixed(2) + '</span></div>';
     html += '<div class="log-row"><span class="log-row-name">Runner Pool</span><span style="color:var(--text-dim);">$' + entry.pools.runner.toFixed(2) + '</span></div>';
 
+    html += balLogHTML(entry);
+
     html += '</div></div>';
   });
 
   el.innerHTML = html;
+}
+
+// The balance sheet at the bottom of a night's log entry.
+//
+// The heading is printed EVERY night, with or without a sheet. A night nobody
+// balanced should be as easy to spot in the log as a night that came up short —
+// if the section just vanished, a missing count would look like no count was
+// needed, and the sheet exists precisely because somebody has to do it nightly.
+//
+// Totals are recomputed here from the stored raw figures, and checked against
+// the pools STORED WITH THIS ENTRY — not against whatever the calculator is
+// showing now. A log entry has to still read true months later.
+function balLogHTML(entry) {
+  var b = entry && entry.balance;
+  var html = '<div class="log-role-title">Balance</div>';
+  if (!b) {
+    return html + '<div class="log-row"><span class="log-row-name" style="color:var(--text-muted); font-style:italic;">No balance sheet filled in for this night</span></div>';
+  }
+  var n = function (x) { return Number(x) || 0; };
+  var shouldBe = (n(b.startBar) + n(b.startDine) + n(b.cash)) - n(b.tips) - n(b.payout);
+  var counted  = n(b.endBar) + n(b.endDine);
+  var diff     = counted - shouldBe;
+  var p = entry.pools || {};
+  var owed = n(p.busser) + n(p.bar) + n(p.runner);
+  var gap = diff - owed;
+  // Same float-dust rule as balMoney: under half a cent is zero, and zero is not negative.
+  var m = function (x) { if (!isFinite(x) || Math.abs(x) < 0.005) x = 0; return (x < 0 ? '-$' : '$') + Math.abs(x).toFixed(2); };
+
+  var row = function (label, val, dim) {
+    return '<div class="log-row"><span class="log-row-name"' + (dim ? ' style="color:var(--text-dim);"' : '') + '>' + label +
+      '</span><span style="color:var(--text-dim);">' + val + '</span></div>';
+  };
+  html += row('Should be in drawer', m(shouldBe), true);
+  html += row('Counted', m(counted), true);
+  html += row('Over / Short', m(diff), true);
+  html += row('Tip-out owed', m(owed), true);
+
+  var colour, text;
+  if (Math.abs(gap) < 0.005) { colour = 'var(--green)'; text = 'BALANCED'; }
+  else if (gap < 0)          { colour = 'var(--red)';   text = 'SHORT ' + m(Math.abs(gap)); }
+  else                       { colour = 'var(--yellow)';text = 'OVER ' + m(gap); }
+  html += '<div class="log-row"><span class="log-row-name" style="color:' + colour + '; font-weight:800;">' + text +
+    '</span><span style="color:var(--text-muted); font-size:12px;">' + m(diff) + ' vs ' + m(owed) + ' owed</span></div>';
+  return html;
 }
 
 function deleteLogEntry(id) {
