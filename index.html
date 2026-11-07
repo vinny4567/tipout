@@ -110,6 +110,10 @@
     color: var(--text); font-size: 17px; font-weight: 700; outline: none;
   }
   .bal-input:focus { border-color: var(--accent); }
+  /* A worked-out line, not a typed one. Dimmer border, no caret, and it does not
+     take focus — a total that can be hand-edited to disagree with its own two
+     parts is the hole this sheet exists to close. */
+  .bal-auto { background: transparent; border-style: dashed; color: var(--accent); cursor: default; }
   .bal-out { font-size: 17px; font-weight: 800; color: var(--text); min-width: 108px; text-align: right; }
   /* The operator lines carry no number — they are the form's own arithmetic, kept
      so the sheet reads the same as the one he has filled in by hand for years. */
@@ -911,13 +915,13 @@
            blank here. Nothing is computed yet: Vinny is walking me through how the
            night actually works before any arithmetic goes in. -->
       <div class="bal-sheet">
-        <div class="bal-row"><div class="bal-label">Starting Bar Bank</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balStartBar" class="bal-input" oninput="balSave()"></div></div>
+        <div class="bal-row"><div class="bal-label">Starting Bar Bank</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balStartBar" class="bal-input" oninput="balCalc()"></div></div>
         <div class="bal-row bal-op"><div class="bal-label">Plus (+)</div><div class="bal-val"></div></div>
-        <div class="bal-row"><div class="bal-label">Starting Dine Bank</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balStartDine" class="bal-input" oninput="balSave()"></div></div>
-        <div class="bal-row bal-eq"><div class="bal-label">Equals (=)</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balEq1" class="bal-input" oninput="balSave()"></div></div>
+        <div class="bal-row"><div class="bal-label">Starting Dine Bank</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balStartDine" class="bal-input" oninput="balCalc()"></div></div>
+        <div class="bal-row bal-eq"><div class="bal-label">Equals (=)</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" id="balEq1" class="bal-input bal-auto" readonly tabindex="-1" aria-readonly="true"></div></div>
 
         <div class="bal-row bal-op"><div class="bal-label">Plus (+)</div><div class="bal-val"></div></div>
-        <div class="bal-row"><div class="bal-label">Cash <span class="bal-note">(listed on bottom of report above &ndash; tips paid)</span></div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balCash" class="bal-input" oninput="balSave()"></div></div>
+        <div class="bal-row"><div class="bal-label">Cash <span class="bal-note">every dollar taken in from customers tonight &mdash; the line just above &ldquo;&minus;Tips Paid&rdquo; on the report, not that figure minus tips</span></div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balCash" class="bal-input" oninput="balSave()"></div></div>
         <div class="bal-row bal-eq"><div class="bal-label">Equals (=)</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balEq2" class="bal-input" oninput="balSave()"></div></div>
 
         <div class="bal-row"><div class="bal-label">Minus (&ndash;) tips paid</div><div class="bal-val"><span class="bal-dollar">$</span><input type="text" inputmode="decimal" id="balTips" class="bal-input" oninput="balSave()"></div></div>
@@ -2113,6 +2117,34 @@ const BAL_FIELDS = [
 const BAL_KEY = 'tipout_balance_v1';
 
 // Kept on this device only. Nothing leaves the iPad.
+// Starting Bar Bank + Starting Dine Bank. Filled only once BOTH are in: a running
+// total that appears while the second box is still empty reads as a finished figure,
+// and the one thing a host must never do is write down a half-counted drawer.
+//
+// Only this line is worked out so far — Vinny is walking the night through a row at
+// a time, and the rest stay typed until he says what they are.
+function balNum(id) {
+  const el = document.getElementById(id);
+  const n = parseFloat(String((el && el.value) || '').replace(/[^0-9.\-]/g, ''));
+  return isFinite(n) ? n : 0;
+}
+function balFilled(id) {
+  const el = document.getElementById(id);
+  return String((el && el.value) || '').trim() !== '';
+}
+function balMoney(n) {
+  return (n < 0 ? '-' : '') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function balCalc() {
+  const out = document.getElementById('balEq1');
+  if (out) {
+    out.value = (balFilled('balStartBar') && balFilled('balStartDine'))
+      ? balMoney(balNum('balStartBar') + balNum('balStartDine'))
+      : '';
+  }
+  balSave();
+}
+
 function balSave() {
   try {
     const o = { date: (document.getElementById('balDate') || {}).value || '' };
@@ -2151,6 +2183,7 @@ function balLoad() {
     });
   } catch (e) {}
   balDayName();
+  balCalc();
 }
 
 // Two taps, same pattern as the Save buttons. A host who means to start a fresh
@@ -2173,7 +2206,7 @@ function balClear(ev) {
   balClearArmed = false;
   if (btn && btn.dataset.label) { btn.textContent = btn.dataset.label; btn.style.color = ''; }
   BAL_FIELDS.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-  balSave();
+  balCalc();
 }
 
 function clearAll() {
