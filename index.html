@@ -1128,6 +1128,22 @@ async function migrateLocalLogToCloud() {
 
 function mapPositionToRole(pos) {
   const p = (pos || '').toLowerCase().trim();
+  // ─── BARBACKS ARE NOT IN THE TIP-OUT ────────────────────────────────────────
+  //
+  // Vinny: "make sure barbacks dont get included in the busser tipout split each
+  // night." They are not bussers and they do not take a busser share.
+  //
+  // ⚠️ FIRST, BEFORE EVERY OTHER RULE, and deliberately not left to the fact that
+  // "barback" happens to match none of them today. It is one combined job title away
+  // from doing so: a position typed "Barback/Busser" hits `p.includes('busser')` below
+  // and lands the person in the busser pool, where they would quietly dilute every
+  // other busser's share for the night with nothing on screen saying why. The 13
+  // barbacks on the MICROS list are currently clear of the busser roster — this is what
+  // keeps that true when somebody edits a position name next month.
+  //
+  // Covers barback, bar back and bar-back. "bb" is deliberately NOT matched: two
+  // letters is short enough to collide with something else entirely.
+  if (/bar\s*-?\s*back/.test(p)) return null;
   // Food Runner — check FIRST so "FR", "F.R.", "food runner" don't get caught by other rules
   if (p === 'fr' || p === 'f.r.' || p === 'f r' || p === 'food runner' || p === 'food run' || p.includes('runner') || p.includes('food run')) return 'Runner';
   // Bartender
